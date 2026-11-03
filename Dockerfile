@@ -1,24 +1,34 @@
-# استخدام بيئة جافا الرسمية للبناء
-FROM eclipse-temurin:17-jdk-alpine AS build
+# ==========================================
+# المرحلة 1: بناء تطبيق Vue / Vite (Build Stage)
+# ==========================================
+FROM node:20-alpine AS build
+
 WORKDIR /app
 
-# نسخ ملفات الإعدادات والـ Gradle
-COPY build.gradle settings.gradle gradlew ./
-COPY gradle gradle
+# نسخ ملفات التبعيات أولاً للاستفادة من الـ Caching في Docker
+COPY package*.json ./
 
-# نسخ كود المصدر
-COPY src src
+# تثبيت المكتبات
+RUN npm install
 
-# بناء المشروع وتوليد ملف الـ Jar
-RUN ./gradlew bootJar -x test
+# نسخ باقي كود المشروع
+COPY . .
 
-# تشغيل التطبيق بنسخة خفيفة من الجافا
-FROM eclipse-temurin:17-jre-alpine
-WORKDIR /app
-COPY --from=build /app/build/libs/*.jar app.jar
+# بناء التطبيق للإنتاج (ينتج مجلد dist)
+RUN npm run build
 
-# منفذ التشغيل الخاص بسبرينغ بوت
-EXPOSE 8080
+# ==========================================
+# المرحلة 2: تشغيل الخادم الخفيف Nginx (Production Stage)
+# ==========================================
+FROM nginx:alpine
 
-# أمر تشغيل التطبيق
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# نسخ المخرجات المبنّية من المرحلة الأولى إلى مجلد Nginx الافتراضي
+COPY --from=build /app/dist /usr/share/nginx/html
+
+# نسخ إعدادات Nginx المخصصة لدعم الـ SPA Routing (مهمة جداً لـ Vue Router)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# فتح المنفذ 80 داخل الحاوية
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

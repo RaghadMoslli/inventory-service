@@ -1,27 +1,55 @@
 <template>
-    <div class="flex min-h-screen items-center justify-center bg-gray-100 p-4" dir="rtl">
-      <div class="w-full max-w-md bg-white p-8 rounded-lg shadow-md">
-        <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">تسجيل الدخول</h2>
+    <div class="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-purple-950 to-slate-950 p-4 relative overflow-hidden" dir="rtl">
+      <!-- خلفيات جمالية مضيئة -->
+      <div class="absolute -top-40 -right-40 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none"></div>
+  
+      <div class="w-full max-w-md bg-white/10 backdrop-blur-xl border border-white/10 p-8 rounded-2xl shadow-2xl relative z-10">
+        <div class="text-center mb-8">
+          <h2 class="text-3xl font-extrabold text-white tracking-tight">تسجيل الدخول</h2>
+          <p class="text-slate-400 text-sm mt-2">مرحباً بك مجدداً، يرجى إدخال بياناتك</p>
+        </div>
         
-        <form @submit.prevent="handleLogin">
-          <div class="mb-4">
-            <label class="block text-gray-700 mb-1 font-medium">البريد الإلكتروني</label>
-            <input v-model="form.email" type="email" required class="w-full border border-gray-300 p-2.5 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <form @submit.prevent="handleLogin" class="space-y-5">
+          <div>
+            <label class="block text-slate-300 mb-2 text-sm font-medium">البريد الإلكتروني</label>
+            <input 
+              v-model="form.email" 
+              type="email" 
+              required 
+              placeholder="name@example.com"
+              class="w-full bg-slate-900/50 border border-slate-700/60 text-white placeholder-slate-500 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200" 
+            />
           </div>
-          <div class="mb-6">
-            <label class="block text-gray-700 mb-1 font-medium">كلمة المرور</label>
-            <input v-model="form.password" type="password" required class="w-full border border-gray-300 p-2.5 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          
+          <div>
+            <label class="block text-slate-300 mb-2 text-sm font-medium">كلمة المرور</label>
+            <input 
+              v-model="form.password" 
+              type="password" 
+              required 
+              placeholder="••••••••"
+              class="w-full bg-slate-900/50 border border-slate-700/60 text-white placeholder-slate-500 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200" 
+            />
           </div>
-          <button type="submit" class="w-full bg-blue-600 text-white py-2.5 rounded font-semibold hover:bg-blue-700 transition">
+  
+          <button 
+            type="submit" 
+            class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-xl font-medium shadow-lg shadow-purple-500/25 hover:from-purple-500 hover:to-indigo-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-slate-900 transition duration-200"
+          >
             دخول
           </button>
         </form>
   
-        <p v-if="errorMessage" class="text-red-500 mt-4 text-center text-sm font-medium">{{ errorMessage }}</p>
+        <p v-if="errorMessage" class="bg-red-500/10 border border-red-500/20 text-red-400 mt-4 p-3 rounded-xl text-center text-sm font-medium">
+          {{ errorMessage }}
+        </p>
   
-        <p class="mt-6 text-center text-gray-600 text-sm">
+        <p class="mt-8 text-center text-slate-400 text-sm">
           ليس لديك حساب؟ 
-          <router-link to="/register" class="text-blue-600 font-semibold hover:underline">إنشاء حساب جديد</router-link>
+          <router-link to="/register" class="text-purple-400 font-semibold hover:text-purple-300 transition duration-150 underline-offset-4 hover:underline">
+            إنشاء حساب جديد
+          </router-link>
         </p>
       </div>
     </div>

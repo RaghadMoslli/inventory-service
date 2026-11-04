@@ -1,0 +1,45 @@
+<?php
+
+use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Configuration\Exceptions;
+use Illuminate\Foundation\Configuration\Middleware;
+use App\Http\Middleware\SecurityHeadersMiddleware;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withRouting(
+        web: __DIR__.'/../routes/web.php',
+        commands: __DIR__.'/../routes/console.php',
+        health: '/up',
+    )
+    ->withMiddleware(function (Middleware $middleware): void {
+        // تسجيل الـ Middleware الخاص بالصلاحيات (Admin)
+        $middleware->alias([
+            'role' => \App\Http\Middleware\CheckRole::class,
+        ]);
+        $middleware->append(SecurityHeadersMiddleware::class);
+    })
+    ->withExceptions(function (Exceptions $exceptions): void {
+        // 1. معالجة خطأ عدم وجود المورد (404 Not Found) للـ API
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException $e, $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'error' => [
+                        'code' => 'NOT_FOUND',
+                        'message' => 'المورد المطلوب غير موجود',
+                    ]
+                ], 404);
+            }
+        });
+
+        // 2. معالجة أخطاء المصادقة (401 Unauthenticated) للـ API
+        $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'error' => [
+                        'code' => 'UNAUTHENTICATED',
+                        'message' => 'يجب تسجيل الدخول للوصول إلى هذا المصدر',
+                    ]
+                ], 401);
+            }
+        });
+    })->create();

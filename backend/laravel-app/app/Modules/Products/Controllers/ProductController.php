@@ -1,0 +1,93 @@
+<?php
+
+namespace App\Modules\Products\Controllers;
+
+use App\Http\Controllers\Controller;
+use App\Modules\Products\Contracts\StockProvider;
+use App\Modules\Products\Models\Product;
+use Illuminate\Http\Request;
+
+class ProductController extends Controller
+{
+    protected StockProvider $stockProvider;
+
+    // حقن الـ StockProvider عبر الـ Constructor
+    public function __construct(StockProvider $stockProvider)
+    {
+        $this->stockProvider = $stockProvider;
+    }
+
+    // جلب قائمة المنتجات مع الكمية المتوفرة
+    public function index(Request $request)
+    {
+        $query = Product::query();
+
+        if ($request->has('category')) {
+            $query->where('category', $request->category);
+        }
+
+        $products = $query->paginate($request->get('per_page', 10));
+
+        // جلب معرفات المنتجات الحالية
+        $productIds = $products->pluck('id')->toArray();
+        
+        // جلب المخزون المتوفر عبر الـ StockProvider
+        $stocks = $this->stockProvider->getStock($productIds);
+
+        // دمج الكمية المتوفرة مع بيانات المنتجات المرسلة
+        $products->getCollection()->transform(function ($product) use ($stocks) {
+            $product->available_quantity = $stocks[$product->id] ?? 0;
+            return $product;
+        });
+
+        return response()->json($products);
+    }
+
+    // عرض تفاصيل منتج واحد مع كميته المتوفرة
+    public function show($id)
+    {
+        $product = Product::findOrFail($id);
+        
+        $stocks = $this->stockProvider->getStock([$product->id]);
+        $product->available_quantity = $stocks[$product->id] ?? 0;
+
+        return response()->json([
+            'data' => $product
+        ]);
+    }
+
+    // إضافة منتج جديد (للأدمن)
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'price' => 'required|numeric|min:0',
+            'category' => 'required|string',
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'initial_stock' => 'required|integer|min:0', // الكمية الأولية للمخزون
+        ]);
+
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            // تخزين الصورة باسم عشوائي
+            $imagePath = $request->file('image')->store('products', 'public');
+        }
+
+        $product = Product::create([
+            'name' => $validated['name'],
+            'description' => $validated['description'] ?? null,
+            'price' => $validated['price'],
+            'category' => $validated['category'],
+            'image_path' => $imagePath,
+        ]);
+
+        // تعيين الكمية الأولية عبر الـ StockProvider للمستودع
+        $this->stockProvider->setStock($product->id, $validated['initial_stock']);
+
+        return response()->json([
+            'message' => 'تم إنشاء المنتج بنجاح',
+            'data' => $product
+        ], 201);
+    }
+}

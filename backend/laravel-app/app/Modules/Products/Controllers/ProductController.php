@@ -31,10 +31,18 @@ class ProductController extends Controller
         // جلب معرفات المنتجات الحالية
         $productIds = $products->pluck('id')->toArray();
         
-        // جلب المخزون المتوفر عبر الـ StockProvider
-        $stocks = $this->stockProvider->getStock($productIds);
+        try {
+            $stocks = $this->stockProvider->getStock($productIds);
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'error' => [
+                    'code' => 'INVENTORY_UNAVAILABLE',
+                    'message' => 'خدمة المخزون غير متاحة حالياً، حاول لاحقاً',
+                    'details' => $e->getMessage(),
+                ],
+            ], 503);
+        }
 
-        // دمج الكمية المتوفرة مع بيانات المنتجات المرسلة
         $products->getCollection()->transform(function ($product) use ($stocks) {
             $product->available_quantity = $stocks[$product->id] ?? 0;
             return $product;
@@ -47,8 +55,19 @@ class ProductController extends Controller
     public function show($id)
     {
         $product = Product::findOrFail($id);
-        
-        $stocks = $this->stockProvider->getStock([$product->id]);
+
+        try {
+            $stocks = $this->stockProvider->getStock([$product->id]);
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'error' => [
+                    'code' => 'INVENTORY_UNAVAILABLE',
+                    'message' => 'خدمة المخزون غير متاحة حالياً، حاول لاحقاً',
+                    'details' => $e->getMessage(),
+                ],
+            ], 503);
+        }
+
         $product->available_quantity = $stocks[$product->id] ?? 0;
 
         return response()->json([
@@ -82,8 +101,19 @@ class ProductController extends Controller
             'image_path' => $imagePath,
         ]);
 
-        // تعيين الكمية الأولية عبر الـ StockProvider للمستودع
-        $this->stockProvider->setStock($product->id, $validated['initial_stock']);
+        try {
+            $this->stockProvider->setStock($product->id, $validated['initial_stock']);
+        } catch (\RuntimeException $e) {
+            $product->delete();
+
+            return response()->json([
+                'error' => [
+                    'code' => 'INVENTORY_UNAVAILABLE',
+                    'message' => 'تم إلغاء إنشاء المنتج لأن خدمة المخزون غير متاحة',
+                    'details' => $e->getMessage(),
+                ],
+            ], 503);
+        }
 
         return response()->json([
             'message' => 'تم إنشاء المنتج بنجاح',

@@ -1,11 +1,8 @@
-version: '3.8'
-
 services:
-  # 1. قاعدة البيانات (PostgreSQL أو MySQL حسب متطلبات مشروعكم)
   db:
     image: postgres:15-alpine
     container_name: ecommerce_db
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ecommerce_platform
       POSTGRES_USER: postgres
@@ -14,25 +11,80 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ecommerce_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
-  # 2. خدمة لارافل الخاصة بكِ (Backend - Laravel)
+  inventory-db:
+    image: postgres:15-alpine
+    container_name: inventory_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: inventory_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    volumes:
+      - inventory_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d inventory_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  inventory:
+    build:
+      context: ./inventory-service
+      dockerfile: Dockerfile
+    container_name: inventory_service
+    restart: unless-stopped
+    depends_on:
+      inventory-db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://inventory-db:5432/inventory_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: password
+      SERVER_PORT: 8080
+      GRPC_SERVER_PORT: 9090
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+
   laravel-app:
     build:
       context: ./backend/laravel-app
       dockerfile: Dockerfile
     container_name: ecommerce_laravel
-    restart: always
+    restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
-      - DB_CONNECTION=pgsql
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_DATABASE=ecommerce_platform
-      - DB_USERNAME=postgres
-      - DB_PASSWORD=secretpassword
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_KEY: base64:2fl+KtvkdphvQyE8mQqGqzqJb0n5nFqJkqYk3n7p0aE=
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: ecommerce_platform
+      DB_USERNAME: postgres
+      DB_PASSWORD: secretpassword
+      INVENTORY_GRPC_HOST: inventory
+      INVENTORY_GRPC_PORT: 9090
+      INVENTORY_GRPC_TIMEOUT_MS: 3000
+      INVENTORY_DRIVER: grpc
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      inventory:
+        condition: service_started
+    volumes:
+      - ./backend/laravel-app:/var/www/html
+      - ./inventory-service/proto:/proto:ro
 
 volumes:
   postgres_data:
+  inventory_postgres_data:

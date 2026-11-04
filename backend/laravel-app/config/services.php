@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'inventory' => [
+        'driver' => env('INVENTORY_DRIVER', 'grpc'),
+        'host' => env('INVENTORY_GRPC_HOST', 'inventory'),
+        'port' => env('INVENTORY_GRPC_PORT', 9090),
+        'timeout_ms' => env('INVENTORY_GRPC_TIMEOUT_MS', 3000),
+    ],
+
 ];

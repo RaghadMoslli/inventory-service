@@ -1,8 +1,8 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.2.5'
+    id 'org.springframework.boot' version '3.5.0'
     id 'io.spring.dependency-management' version '1.1.7'
-    id 'com.google.protobuf' version '0.9.4'
+    id 'com.google.protobuf' version '0.9.5'
 }
 
 group = 'com.shop'
@@ -19,29 +19,33 @@ repositories {
 }
 
 dependencies {
-    // Spring Boot
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    
-    // حل مشكلة @javax.annotation.Generated في Java 21
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
     compileOnly 'javax.annotation:javax.annotation-api:1.3.2'
-    implementation 'jakarta.annotation:jakarta.annotation-api:2.1.1'
+    implementation 'jakarta.annotation:jakarta.annotation-api'
 
-    // Flyway Database Migration
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+
     implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
 
-    // PostgreSQL
     runtimeOnly 'org.postgresql:postgresql'
 
-    // gRPC
-    implementation 'net.devh:grpc-server-spring-boot-starter:2.15.0.RELEASE'
-    implementation 'io.grpc:grpc-netty-shaded:1.60.0'
-    implementation 'io.grpc:grpc-protobuf:1.60.0'
-    implementation 'io.grpc:grpc-stub:1.60.0'
-    implementation 'com.google.protobuf:protobuf-java:3.25.1'
+    implementation 'net.devh:grpc-server-spring-boot-starter:3.1.0.RELEASE'
+    implementation 'io.grpc:grpc-netty-shaded:1.69.0'
+    implementation 'io.grpc:grpc-protobuf:1.69.0'
+    implementation 'io.grpc:grpc-stub:1.69.0'
+    implementation 'com.google.protobuf:protobuf-java:3.25.5'
 
-    // Testing
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:postgresql'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
@@ -55,12 +59,12 @@ sourceSets {
 
 protobuf {
     protoc {
-        artifact = 'com.google.protobuf:protoc:3.25.1'
+        artifact = 'com.google.protobuf:protoc:3.25.5'
     }
 
     plugins {
         grpc {
-            artifact = 'io.grpc:protoc-gen-grpc-java:1.60.0'
+            artifact = 'io.grpc:protoc-gen-grpc-java:1.69.0'
         }
     }
 
@@ -79,11 +83,9 @@ tasks.named('test') {
 
 tasks.named('bootJar') {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    enabled = true
 }
 
-tasks.named('bootJar') {
-    enabled = false
-}
 tasks.named('jar') {
     enabled = false
 }

@@ -1,7 +1,16 @@
 package com.shop.inventory.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -14,7 +23,7 @@ import java.time.LocalDateTime;
 public class Reservation {
 
     @Id
-    private String id; // UUID
+    private String id;
 
     @Column(name = "request_id", unique = true, nullable = false)
     private String requestId;

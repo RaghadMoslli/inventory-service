@@ -1,7 +1,5 @@
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre
 WORKDIR /app
 COPY build/libs/*.jar app.jar
-RUN addgroup -S app && adduser -S app -G app && chown app:app app.jar
-USER app
-EXPOSE 8080 9090
+EXPOSE 9090
 ENTRYPOINT ["java", "-jar", "app.jar"]

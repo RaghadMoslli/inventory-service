@@ -113,7 +113,24 @@
  
     <!-- محتوى الصفحة الرئيسية والمنتجات -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      
+
+      <!-- التبويبات -->
+      <div class="mb-6 inline-flex gap-1 p-1 bg-slate-800/60 border border-slate-800 rounded-2xl">
+        <button
+          v-for="tab in tabs"
+          :key="tab.key"
+          @click="activeTab = tab.key"
+          :class="[
+            'px-5 py-2 rounded-xl text-xs font-bold transition-all',
+            activeTab === tab.key ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+          ]"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
+
+      <template v-if="activeTab === 'products'">
+
       <!-- ترحيب / رأس الصفحة وفلاتر التصنيفات -->
       <div class="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-800/40 backdrop-blur-xl border border-slate-800 p-6 rounded-3xl shadow-xl">
         <div>
@@ -265,6 +282,10 @@
         </button>
       </div>
 
+      </template>
+
+      <OrdersSection v-else />
+
     </main>
   </div>
 </template>
@@ -274,6 +295,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useNotificationStore } from '../stores/notifications'
 import { useProductStore } from '../stores/products'
+import OrdersSection from '../components/OrdersSection.vue'
 import { useRouter } from 'vue-router'
  
 const authStore = useAuthStore()
@@ -282,6 +304,11 @@ const productStore = useProductStore()
 const router = useRouter()
  
 const showNotifications = ref(false)
+const activeTab = ref('products')
+const tabs = [
+  { key: 'products', label: 'المنتجات' },
+  { key: 'orders', label: 'الطلبات' }
+]
 const selectedCategory = ref('')
 const categories = ['Books', 'Electronics', 'Home', 'Clothing']
 let pollingTimer = null

@@ -24,7 +24,7 @@ class GrpcStockProvider implements StockProvider
         $this->target = sprintf('%s:%d', $host, $port);
     }
 
-    public function getStock(array $productIds): array
+   public function getStock(array $productIds): array
     {
         if ($productIds === []) {
             return [];
@@ -36,8 +36,15 @@ class GrpcStockProvider implements StockProvider
 
         $response = $this->call('GetStock', $payload);
         $result = [];
+        
         foreach ($response['items'] ?? [] as $item) {
-            $result[(int) $item['product_id']] = (int) $item['available'];
+            // دعم كلا الاحتمالات لتسمية المفاتيح منعاً لأي خطأ
+            $id = $item['product_id'] ?? $item['productId'] ?? 0;
+            $available = $item['available'] ?? $item['availableQuantity'] ?? 0;
+            
+            if ($id > 0) {
+                $result[(int) $id] = (int) $available;
+            }
         }
 
         foreach ($productIds as $id) {

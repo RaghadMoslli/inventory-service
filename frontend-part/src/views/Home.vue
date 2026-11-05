@@ -221,15 +221,21 @@
                 </span>
               </div>
 
-              <button 
-                :disabled="product.available_quantity === 0"
-                class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed text-white py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-purple-600/20 transition-all flex items-center justify-center gap-2"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                <span>أضف للسلة</span>
-              </button>
+              <button
+  @click="openProductDetails(product)"
+  :disabled="product.available_quantity === 0"
+  class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed text-white py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-purple-600/20 transition-all flex items-center justify-center gap-2"
+>
+  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+    />
+  </svg>
+  عرض التفاصيل والطلب
+</button>
             </div>
           </div>
         </div>
@@ -266,29 +272,192 @@
 
       <OrdersSection v-else />
 
+      <!-- Product Details & Create Order Modal -->
+<div
+  v-if="showProductModal"
+  class="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+  @click.self="closeProductModal"
+>
+  <div
+    class="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl overflow-hidden"
+    dir="rtl"
+  >
+    <!-- Modal Header -->
+    <div class="flex items-center justify-between p-5 border-b border-slate-800">
+      <h3 class="text-lg font-extrabold text-white">
+        تفاصيل المنتج
+      </h3>
+
+      <button
+        @click="closeProductModal"
+        class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
+        aria-label="إغلاق"
+      >
+        ✕
+      </button>
+    </div>
+
+    <!-- Loading -->
+    <div
+      v-if="productStore.loading && !productStore.currentProduct"
+      class="p-10 text-center text-slate-400"
+    >
+      <div class="w-8 h-8 mx-auto mb-3 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+      جاري تحميل التفاصيل...
+    </div>
+
+    <!-- Error -->
+    <div
+      v-else-if="productStore.error && !productStore.currentProduct"
+      class="p-6 text-center text-rose-300 text-sm"
+    >
+      {{ productStore.error }}
+    </div>
+
+    <!-- Product Details -->
+    <div v-else-if="productStore.currentProduct" class="p-5">
+      <div class="h-52 mb-5 bg-slate-800 rounded-2xl overflow-hidden flex items-center justify-center">
+        <img
+          v-if="productStore.currentProduct.image_path"
+          :src="productStore.currentProduct.image_path"
+          :alt="productStore.currentProduct.name"
+          class="w-full h-full object-cover"
+        />
+
+        <span v-else class="text-slate-500 text-sm">
+          لا توجد صورة للمنتج
+        </span>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <h4 class="text-xl font-extrabold text-white">
+            {{ productStore.currentProduct.name }}
+          </h4>
+
+          <p class="text-xs text-purple-400 mt-1">
+            {{ productStore.currentProduct.category }}
+          </p>
+        </div>
+
+        <p class="text-sm text-slate-300 leading-7">
+          {{ productStore.currentProduct.description || 'لا يوجد وصف لهذا المنتج.' }}
+        </p>
+
+        <div class="flex justify-between items-center py-3 border-y border-slate-800">
+          <span class="text-slate-400 text-sm">السعر</span>
+          <span class="text-emerald-400 font-extrabold text-lg">
+            {{ productStore.currentProduct.price }} $
+          </span>
+        </div>
+
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400 text-sm">الكمية المتوفرة</span>
+          <span class="text-indigo-400 font-bold text-sm">
+            {{ productStore.currentProduct.available_quantity ?? selectedProduct?.available_quantity ?? 0 }}
+          </span>
+        </div>
+
+        <!-- Quantity -->
+        <div class="pt-2">
+          <label class="block text-sm text-slate-300 mb-2">
+            الكمية المطلوبة
+          </label>
+
+          <input
+            v-model.number="orderQuantity"
+            type="number"
+            min="1"
+            :max="productStore.currentProduct.available_quantity ?? selectedProduct?.available_quantity ?? 1"
+            class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
+        </div>
+
+        <!-- Order Error -->
+        <div
+          v-if="orderStore.error"
+          class="p-3 rounded-xl bg-rose-950/30 border border-rose-800 text-rose-300 text-xs"
+        >
+          {{ orderStore.error }}
+        </div>
+
+        <!-- Success -->
+        <div
+          v-if="orderSuccess"
+          class="p-3 rounded-xl bg-emerald-950/30 border border-emerald-800 text-emerald-300 text-sm"
+        >
+          <p class="font-bold">تم إنشاء الطلب بنجاح!</p>
+          <p v-if="createdOrder?.id" class="mt-1">
+            رقم الطلب: #{{ createdOrder.id }}
+          </p>
+        </div>
+
+        <!-- Submit -->
+        <button
+          @click="submitOrder"
+          :disabled="orderStore.loading || !canSubmitOrder || !!orderSuccess"
+          class="w-full mt-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold text-sm transition-all"
+        >
+          {{ orderStore.loading ? 'جاري إنشاء الطلب...' : orderSuccess ? 'تم إنشاء الطلب' : 'تأكيد الطلب' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
     </main>
   </div>
 </template>
  
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useNotificationStore } from '../stores/notifications'
 import { useProductStore } from '../stores/products'
 import OrdersSection from '../components/OrdersSection.vue'
 import { useRouter } from 'vue-router'
+import { useOrderStore } from '../stores/orders'
  
 const authStore = useAuthStore()
 const notifStore = useNotificationStore()
 const productStore = useProductStore()
+const orderStore = useOrderStore()
+
+const showProductModal = ref(false)
+const selectedProduct = ref(null)
+const orderQuantity = ref(1)
+const orderSuccess = ref(false)
+const createdOrder = ref(null)
+
+const canSubmitOrder = computed(() => {
+  const product = productStore.currentProduct
+  if (!product) return false
+
+  const available = Number(
+    product.available_quantity ?? selectedProduct.value?.available_quantity ?? 0
+  )
+
+  return (
+    Number.isInteger(orderQuantity.value) &&
+    orderQuantity.value >= 1 &&
+    orderQuantity.value <= available
+  )
+})
 const router = useRouter()
  
 const showNotifications = ref(false)
 const activeTab = ref('products')
-const tabs = [
-  { key: 'products', label: 'المنتجات' },
-  { key: 'orders', label: 'الطلبات' }
-]
+const tabs = computed(() => {
+  const items = [
+    { key: 'products', label: 'المنتجات' }
+  ]
+
+  if (authStore.isAdmin) {
+    items.push({ key: 'orders', label: 'إدارة الطلبات' })
+  }
+
+  return items
+})
 const selectedCategory = ref('')
 const categories = ['Books', 'Electronics', 'Home', 'Clothing']
 let pollingTimer = null
@@ -300,6 +469,51 @@ const toggleNotifications = () => {
 const handleReadNotification = async (item) => {
   if (!item.read_at && !item.is_read) {
     await notifStore.markAsRead(item.id)
+  }
+}
+
+const openProductDetails = async (product) => {
+  selectedProduct.value = product
+  orderQuantity.value = 1
+  orderSuccess.value = false
+  createdOrder.value = null
+  showProductModal.value = true
+
+  await productStore.fetchProductDetails(product.id)
+}
+
+const closeProductModal = () => {
+  showProductModal.value = false
+  selectedProduct.value = null
+  orderQuantity.value = 1
+  orderSuccess.value = false
+  createdOrder.value = null
+  productStore.currentProduct = null
+  orderStore.error = null
+}
+
+const submitOrder = async () => {
+  if (!canSubmitOrder.value) return
+
+  orderSuccess.value = false
+  createdOrder.value = null
+
+  const product = productStore.currentProduct
+
+  const result = await orderStore.createOrder(
+    product.id,
+    orderQuantity.value
+  )
+
+  if (result) {
+    createdOrder.value = result
+    orderSuccess.value = true
+
+    // تحديث قائمة المنتجات بعد إنشاء الطلب
+    await productStore.fetchProducts({
+      page: productStore.meta.current_page,
+      category: selectedCategory.value || undefined
+    })
   }
 }
  

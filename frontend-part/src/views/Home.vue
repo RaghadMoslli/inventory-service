@@ -1,11 +1,9 @@
 <template>
   <div class="min-h-screen bg-slate-900 text-slate-100 selection:bg-purple-500 selection:text-white" dir="rtl">
     
-    <!-- Navbar الرئيسي -->
     <header class="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/80 border-b border-slate-800 shadow-lg shadow-slate-950/20">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex justify-between items-center">
         
-        <!-- شعار المنصة / العنوان -->
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
             <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -19,7 +17,6 @@
         
         <div class="flex items-center gap-4 sm:gap-6">
           
-          <!-- قسم الإشعارات -->
           <div class="relative">
             <button 
               @click="toggleNotifications"
@@ -39,7 +36,6 @@
               </span>
             </button>
    
-            <!-- القائمة المنسدلة للإشعارات -->
             <div 
               v-if="showNotifications" 
               class="absolute left-0 mt-3 w-80 sm:w-96 bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 z-50 overflow-hidden backdrop-blur-2xl ring-1 ring-white/10"
@@ -88,7 +84,6 @@
             </div>
           </div>
    
-          <!-- تفاصيل المستخدم وزر الخروج -->
           <div class="hidden md:flex items-center gap-3 pl-3 border-l border-slate-800">
             <div class="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-purple-400 text-sm shadow-inner">
               {{ (authStore.user?.name || 'م')[0] }}
@@ -111,10 +106,8 @@
       </div>
     </header>
  
-    <!-- محتوى الصفحة الرئيسية والمنتجات -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
-      <!-- التبويبات -->
       <div class="mb-6 inline-flex gap-1 p-1 bg-slate-800/60 border border-slate-800 rounded-2xl">
         <button
           v-for="tab in tabs"
@@ -131,7 +124,6 @@
 
       <template v-if="activeTab === 'products'">
 
-      <!-- ترحيب / رأس الصفحة وفلاتر التصنيفات -->
       <div class="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-800/40 backdrop-blur-xl border border-slate-800 p-6 rounded-3xl shadow-xl">
         <div>
           <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold border border-emerald-500/20 mb-3">
@@ -142,7 +134,6 @@
           <p class="text-slate-400 text-sm mt-1">تصفح أحدث المنتجات مع الكميات المتاحة مباشرة من المستودع.</p>
         </div>
 
-        <!-- فلاتر التصنيفات -->
         <div class="flex flex-wrap gap-2">
           <button 
             @click="filterByCategory('')"
@@ -167,26 +158,22 @@
         </div>
       </div>
 
-      <!-- حالة التحميل -->
       <div v-if="productStore.loading && !productStore.products.length" class="flex flex-col items-center justify-center py-20 gap-3">
         <div class="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
         <p class="text-slate-400 text-sm">جاري جلب المنتجات...</p>
       </div>
 
-      <!-- حالة الخطأ -->
       <div v-else-if="productStore.error" class="bg-rose-950/30 border border-rose-800 text-rose-300 p-6 rounded-2xl text-center mb-8">
         <p class="font-bold text-base mb-1">حدث خطأ أثناء تحميل المنتجات</p>
         <p class="text-xs text-rose-400">{{ productStore.error }}</p>
       </div>
 
-      <!-- شبكة عرض المنتجات -->
       <div v-else-if="productStore.products.length > 0" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         <div 
           v-for="product in productStore.products" 
           :key="product.id"
           class="bg-slate-800/60 backdrop-blur-xl border border-slate-800 rounded-2xl overflow-hidden shadow-lg hover:border-slate-700 transition-all duration-300 flex flex-col group"
         >
-          <!-- صورة المنتج أو الغلاف الافتراضي -->
           <div class="h-48 bg-slate-900/60 relative overflow-hidden flex items-center justify-center border-b border-slate-800">
             <img 
               v-if="product.image_path" 
@@ -201,13 +188,11 @@
               <span class="text-[10px]">بدون صورة</span>
             </div>
             
-            <!-- تصنيف المنتج -->
             <span class="absolute top-3 right-3 text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-900/80 text-purple-300 backdrop-blur-md border border-slate-700">
               {{ product.category }}
             </span>
           </div>
 
-          <!-- تفاصيل المنتج -->
           <div class="p-5 flex-1 flex flex-col justify-between">
             <div>
               <h3 class="font-bold text-white text-base mb-1.5 group-hover:text-purple-400 transition-colors line-clamp-1">
@@ -219,13 +204,11 @@
             </div>
 
             <div>
-              <!-- السعر والكمية المتوفرة -->
               <div class="flex items-center justify-between mb-4 pt-3 border-t border-slate-800/80">
                 <span class="text-emerald-400 font-extrabold text-lg">
                   {{ product.price }} <span class="text-xs font-normal text-slate-400">$</span>
                 </span>
                 
-                <!-- شارة الكمية المتوفرة (قادمة من الـ API وخدمة المستودع)[cite: 1] -->
                 <span 
                   :class="[
                     'text-[11px] font-bold px-2.5 py-1 rounded-full border',
@@ -238,7 +221,6 @@
                 </span>
               </div>
 
-              <!-- زر إضافة للسلة -->
               <button 
                 :disabled="product.available_quantity === 0"
                 class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed text-white py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-purple-600/20 transition-all flex items-center justify-center gap-2"
@@ -253,7 +235,6 @@
         </div>
       </div>
 
-      <!-- حالة المنتجات الفارغة -->
       <div v-else class="text-center py-20 bg-slate-800/30 rounded-3xl border border-slate-800">
         <svg class="w-12 h-12 text-slate-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
@@ -261,7 +242,6 @@
         <p class="text-slate-400 font-medium text-sm">لا توجد منتجات مطابقة للعرض حالياً.</p>
       </div>
 
-      <!-- أزرار التنقل بين الصفحات (Pagination) -->
       <div v-if="productStore.meta.last_page > 1" class="flex justify-center items-center gap-3 mt-10">
         <button 
           @click="changePage(productStore.meta.current_page - 1)"
@@ -313,32 +293,27 @@ const selectedCategory = ref('')
 const categories = ['Books', 'Electronics', 'Home', 'Clothing']
 let pollingTimer = null
  
-// إظهار/إخفاء القائمة المنسدلة للإشعارات
 const toggleNotifications = () => {
   showNotifications.value = !showNotifications.value
 }
  
-// تعليم الإشعار كمقروء عند الضغط عليه
 const handleReadNotification = async (item) => {
   if (!item.read_at && !item.is_read) {
     await notifStore.markAsRead(item.id)
   }
 }
  
-// تنسيق التاريخ بشكل بسيط
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
   const date = new Date(dateStr)
   return date.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
 }
 
-// تصفية المنتجات حسب التصنيف
 const filterByCategory = async (category) => {
   selectedCategory.value = category
   await productStore.fetchProducts({ page: 1, category: category || undefined })
 }
 
-// التنقل بين الصفحات
 const changePage = async (page) => {
   if (page >= 1 && page <= productStore.meta.last_page) {
     await productStore.fetchProducts({ page, category: selectedCategory.value || undefined })
@@ -350,7 +325,6 @@ const handleLogout = async () => {
   router.push('/login')
 }
  
-// عند تحميل المكون: جلب الإشعارات والمنتجات وبدء الـ Polling للإشعارات
 onMounted(() => {
   notifStore.fetchNotifications()
   productStore.fetchProducts({ page: 1 })
@@ -360,7 +334,6 @@ onMounted(() => {
   }, 30000)
 })
  
-// تنظيف التايمر عند مغادرة الصفحة
 onUnmounted(() => {
   if (pollingTimer) clearInterval(pollingTimer)
 })

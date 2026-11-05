@@ -1,6 +1,6 @@
 <template>
     <div class="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-purple-950 to-slate-950 p-4 relative overflow-hidden" dir="rtl">
-      <!-- خلفيات جمالية مضيئة -->
+
       <div class="absolute -top-40 -right-40 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
       <div class="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none"></div>
   
@@ -11,7 +11,6 @@
         </div>
         
         <form @submit.prevent="handleRegister" class="space-y-4">
-          <!-- الاسم -->
           <div>
             <label class="block text-slate-300 mb-2 text-sm font-medium">الاسم الكامل</label>
             <input 
@@ -23,7 +22,6 @@
             />
           </div>
   
-          <!-- البريد الإلكتروني -->
           <div>
             <label class="block text-slate-300 mb-2 text-sm font-medium">البريد الإلكتروني</label>
             <input 
@@ -35,7 +33,6 @@
             />
           </div>
   
-          <!-- كلمة المرور -->
           <div>
             <label class="block text-slate-300 mb-2 text-sm font-medium">كلمة المرور</label>
             <input 
@@ -47,7 +44,6 @@
             />
           </div>
   
-          <!-- زر الإرسال -->
           <button 
             type="submit" 
             :disabled="loading"
@@ -58,12 +54,10 @@
           </button>
         </form>
   
-        <!-- أخطاء الاستجابة -->
         <p v-if="errorMessage" class="bg-red-500/10 border border-red-500/20 text-red-400 mt-4 p-3 rounded-xl text-center text-sm font-medium">
           {{ errorMessage }}
         </p>
   
-        <!-- رابط الانتقال لتسجيل الدخول -->
         <p class="mt-8 text-center text-slate-400 text-sm">
           لديك حساب بالفعل؟ 
           <router-link to="/login" class="text-purple-400 font-semibold hover:text-purple-300 transition duration-150 underline-offset-4 hover:underline">
@@ -93,7 +87,7 @@
   
   const handleRegister = async () => {
     try {
-      loading.value = `true` // ملاحظة: تم الحفاظ على المنطق كما هو بدقة
+      loading.value = `true`
       loading.value = true
       errorMessage.value = ''
       await authStore.register(form.value)

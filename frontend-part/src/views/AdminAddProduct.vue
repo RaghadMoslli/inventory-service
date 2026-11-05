@@ -2,7 +2,6 @@
   <div class="min-h-screen bg-slate-900 text-slate-100 py-10 px-4 sm:px-6 lg:px-8" dir="rtl">
     <div class="max-w-3xl mx-auto">
       
-      <!-- رأس الصفحة -->
       <div class="mb-8 flex justify-between items-center bg-slate-800/50 border border-slate-800 p-6 rounded-3xl shadow-xl backdrop-blur-xl">
         <div>
           <button 
@@ -28,10 +27,8 @@
         </router-link>
       </div>
 
-      <!-- نموذج الإضافة -->
       <form @submit.prevent="handleSubmit" class="bg-slate-800/40 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6">
         
-        <!-- اسم المنتج -->
         <div>
           <label class="block text-xs font-bold text-slate-300 mb-2">اسم المنتج</label>
           <input 
@@ -45,7 +42,6 @@
           </p>
         </div>
 
-        <!-- التصنيف والسعر -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
             <label class="block text-xs font-bold text-slate-300 mb-2">التصنيف</label>
@@ -79,7 +75,6 @@
           </div>
         </div>
 
-        <!-- الكمية الأولية للمستودع (initial_stock) -->
         <div>
           <label class="block text-xs font-bold text-slate-300 mb-2">الكمية الأولية في المستودع (initial_stock)</label>
           <input 
@@ -94,7 +89,6 @@
           </p>
         </div>
 
-        <!-- الوصف -->
         <div>
           <label class="block text-xs font-bold text-slate-300 mb-2">وصف المنتج</label>
           <textarea 
@@ -108,7 +102,6 @@
           </p>
         </div>
 
-        <!-- رفع الصورة -->
         <div>
           <label class="block text-xs font-bold text-slate-300 mb-2">صورة المنتج</label>
           <input 
@@ -122,12 +115,10 @@
           </p>
         </div>
 
-        <!-- رسالة الخطأ العامة -->
         <div v-if="productStore.error && typeof productStore.error === 'string'" class="bg-rose-950/40 border border-rose-800 text-rose-300 p-4 rounded-xl text-xs">
           {{ productStore.error }}
         </div>
 
-        <!-- زر الحفظ -->
         <button 
           type="submit" 
           :disabled="productStore.loading"

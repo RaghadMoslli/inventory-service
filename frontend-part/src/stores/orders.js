@@ -2,7 +2,6 @@ import { defineStore } from 'pinia'
 import api from '../api/axios'
 import { parseApiError } from '../utils/apiError'
 
-// القيم المسموحة حسب PATCH api/orders/{order}/status
 export const ORDER_STATUSES = {
   PENDING: 'قيد الانتظار',
   CONFIRMED: 'مؤكد',
@@ -19,7 +18,6 @@ export const useOrderStore = defineStore('orders', {
   }),
 
   actions: {
-    // GET api/orders/{order}
     async fetchOrder(id) {
       this.loading = true
       this.error = null
@@ -36,7 +34,6 @@ export const useOrderStore = defineStore('orders', {
       }
     },
 
-    // PATCH api/orders/{order}/status  { status }
     async updateStatus(id, status) {
       this.error = null
       try {

@@ -9,19 +9,16 @@ export const useNotificationStore = defineStore('notifications', {
   }),
 
   getters: {
-    // حساب عدد الإشعارات غير المقروءة
     unreadCount: (state) => {
       return state.notifications.filter(n => !n.read_at && !n.is_read).length
     }
   },
 
   actions: {
-    // جلب قائمة الإشعارات
     async fetchNotifications() {
       try {
         this.loading = true
         const response = await api.get('/notifications')
-        // التعامل مع اختلاف شكل الـ Response (سواء data مباشرة أو داخل data.data)
         this.notifications = response.data.data || response.data || []
       } catch (err) {
         this.error = err.response?.data?.message || 'فشل جلب الإشعارات'
@@ -30,12 +27,10 @@ export const useNotificationStore = defineStore('notifications', {
       }
     },
 
-    // تحديد إشعار محدد كمقروء
     async markAsRead(notificationId) {
       try {
         await api.patch(`/notifications/${notificationId}/read`)
         
-        // تحديث الحالة محلياً فوراً
         const target = this.notifications.find(n => n.id === notificationId)
         if (target) {
           target.read_at = new Date().toISOString()

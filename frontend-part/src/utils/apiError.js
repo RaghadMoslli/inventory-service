@@ -1,6 +1,4 @@
-// يحوّل أي خطأ قادم من axios إلى شكل موحّد وسهل العرض.
-// الباك بيرجّع الأخطاء بالشكل: { error: { code, message } }
-// وأخطاء الفاليديشن (422) غالباً: { errors: { field: [msg] } } أو { error: { details: {...} } }
+
 export function parseApiError(error) {
   const data = error?.response?.data
   const status = error?.response?.status

@@ -1,3 +1,4 @@
+
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
@@ -22,7 +23,10 @@ const routes = [
     path: '/admin/products/create',
     name: 'AdminAddProduct',
     component: () => import('../views/AdminAddProduct.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true }
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true
+    }
   }
 ]
 
@@ -31,29 +35,21 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach((to) => {
   const authStore = useAuthStore()
 
-  // 1. إذا كانت الصفحة تتطلب تسجيل دخول والمستخدم غير مسجل
+  // الصفحات التي تتطلب تسجيل الدخول
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    return next('/login')
+    return '/login'
   }
 
-  // 2. إذا كان المستخدم أدمن وحاول الذهاب لأي صفحة غير صفحة الإضافة
-  if (authStore.isAuthenticated && authStore.isAdmin) {
-    if (to.path !== '/admin/products/create') {
-      return next('/admin/products/create')
-    }
-    return next() // للسماح بالدخول إذا كان المسار بالفعل /admin/products/create
-  }
-
-  // 3. إذا كان مستخدم عادي وحاول دخول صفحة الأدمن
+  // الصفحات المخصصة للأدمن
   if (to.meta.requiresAdmin && !authStore.isAdmin) {
-    return next('/')
+    return '/'
   }
 
-  // 4. السير الطبيعي لباقي الحالات
-  next()
+  // السماح للأدمن والمستخدم العادي بفتح الرئيسية
+  return true
 })
 
 export default router

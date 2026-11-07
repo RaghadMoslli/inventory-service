@@ -2,7 +2,6 @@ import { defineStore } from 'pinia'
 import api from '../api/axios'
 import { parseApiError } from '../utils/apiError'
 
-// تحقق مبدئي من نفس شروط الباك (حسب التوثيق) قبل إرسال الطلب
 export function validateProductPayload(p = {}) {
   const errors = {}
   if (!p.name || !String(p.name).trim()) errors.name = 'اسم المنتج مطلوب'
@@ -27,7 +26,6 @@ export function validateProductPayload(p = {}) {
   return errors
 }
 
-// نبني FormData ونرسل فقط الحقول الموجودة (description و image اختياريان)
 function toFormData(payload) {
   if (payload instanceof FormData) return payload
   const form = new FormData()
@@ -43,7 +41,7 @@ export const useProductStore = defineStore('products', {
     products: [],
     currentProduct: null,
     loading: false,
-    error: null, // نص جاهز للعرض
+    error: null, 
     validationErrors: {},
     meta: {
       current_page: 1,
@@ -58,7 +56,6 @@ export const useProductStore = defineStore('products', {
   },
 
   actions: {
-    // جلب قائمة المنتجات مع الفلترة والـ Pagination
     async fetchProducts(params = {}) {
       this.loading = true
       this.error = null
@@ -68,7 +65,6 @@ export const useProductStore = defineStore('products', {
 
         this.products = Array.isArray(body) ? body : body.data ?? []
 
-        // لاراول Resource: الـ pagination داخل meta — بدون Resource: الحقول بالمستوى الأعلى
         const m = body.meta ?? (body.last_page ? body : null)
         this.meta = m
           ? {
@@ -88,7 +84,6 @@ export const useProductStore = defineStore('products', {
       }
     },
 
-    // تفاصيل منتج (مع available_quantity القادمة من gRPC)
     async fetchProductDetails(id) {
       this.loading = true
       this.error = null
@@ -104,7 +99,6 @@ export const useProductStore = defineStore('products', {
       }
     },
 
-    // إضافة منتج (Admin) — multipart/form-data
     async createProduct(payload) {
       this.loading = true
       this.error = null
@@ -120,7 +114,6 @@ export const useProductStore = defineStore('products', {
       }
 
       try {
-        // بدون تحديد Content-Type يدوياً: المتصفح بيضيف الـ boundary تلقائياً
         const response = await api.post('/products', toFormData(payload))
         return response.data.data ?? response.data
       } catch (error) {

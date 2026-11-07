@@ -83,7 +83,7 @@ class ProductController extends Controller
             'description' => 'nullable|string',
             'price' => 'required|numeric|min:0',
             'category' => 'required|string',
-            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'image' => 'nullable',
             'initial_stock' => 'required|integer|min:0', // الكمية الأولية للمخزون
         ]);
 

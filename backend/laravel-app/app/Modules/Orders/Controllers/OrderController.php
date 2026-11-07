@@ -10,10 +10,13 @@ use App\Modules\Products\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use RuntimeException;
 
 class OrderController extends Controller
 {
+    use AuthorizesRequests;
+    
     public function __construct(protected StockProvider $inventoryGateway)
     {
     }

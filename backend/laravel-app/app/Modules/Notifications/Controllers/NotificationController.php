@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
-    // جلب إشعارات المستخدم الحالي فقط (الأحدث أولاً)
+    
     public function index(Request $request)
     {
         $notifications = Notification::where('user_id', $request->user()->id)
@@ -18,7 +18,7 @@ class NotificationController extends Controller
         return response()->json($notifications);
     }
 
-    // تعليم إشعار معين كمقروء (للمالك فقط)
+    
     public function markAsRead(Request $request, $id)
     {
         $notification = Notification::where('id', $id)

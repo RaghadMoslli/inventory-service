@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Products\Contracts\StockProvider;
 use App\Modules\Products\Models\Product;
 use Illuminate\Http\Request;
+use OpenApi\Annotations as OA;
 
 class ProductController extends Controller
 {
@@ -17,6 +18,29 @@ class ProductController extends Controller
         $this->stockProvider = $stockProvider;
     }
 
+    /**
+     * @OA\Get(
+     *      path="/api/products",
+     *      summary="جلب قائمة المنتجات مع الكمية المتوفرة",
+     *      tags={"Products"},
+     *      @OA\Parameter(
+     *          name="category",
+     *          in="query",
+     *          required=false,
+     *          description="تصفية المنتجات حسب التصنيف",
+     *          @OA\Schema(type="string")
+     *      ),
+     *      @OA\Parameter(
+     *          name="per_page",
+     *          in="query",
+     *          required=false,
+     *          description="عدد العناصر في الصفحة الواحدة",
+     *          @OA\Schema(type="integer", default=10)
+     *      ),
+     *      @OA\Response(response=200, description="تم جلب قائمة المنتجات بنجاح"),
+     *      @OA\Response(response=503, description="خدمة المخزون غير متاحة حالياً")
+     * )
+     */
     // جلب قائمة المنتجات مع الكمية المتوفرة
     public function index(Request $request)
     {
@@ -51,6 +75,23 @@ class ProductController extends Controller
         return response()->json($products);
     }
 
+    /**
+     * @OA\Get(
+     *      path="/api/products/{id}",
+     *      summary="عرض تفاصيل منتج واحد مع كميته المتوفرة",
+     *      tags={"Products"},
+     *      @OA\Parameter(
+     *          name="id",
+     *          in="path",
+     *          required=true,
+     *          description="معرف المنتج",
+     *          @OA\Schema(type="integer")
+     *      ),
+     *      @OA\Response(response=200, description="تم جلب تفاصيل المنتج بنجاح"),
+     *      @OA\Response(response=404, description="المنتج غير موجود"),
+     *      @OA\Response(response=503, description="خدمة المخزون غير متاحة حالياً")
+     * )
+     */
     // عرض تفاصيل منتج واحد مع كميته المتوفرة
     public function show($id)
     {
@@ -75,6 +116,32 @@ class ProductController extends Controller
         ]);
     }
 
+    /**
+     * @OA\Post(
+     *      path="/api/products",
+     *      summary="إضافة منتج جديد وتحديد كميته الأولية (للمشرفين)",
+     *      tags={"Products"},
+     *      security={{"bearerAuth":{}}},
+     *      @OA\RequestBody(
+     *          required=true,
+     *          @OA\MediaType(
+     *              mediaType="multipart/form-data",
+     *              @OA\Schema(
+     *                  required={"name", "price", "category", "initial_stock"},
+     *                  @OA\Property(property="name", type="string", example="هاتف ذكي"),
+     *                  @OA\Property(property="description", type="string", example="وصف المنتج هنا"),
+     *                  @OA\Property(property="price", type="number", format="float", example=499.99),
+     *                  @OA\Property(property="category", type="string", example="Electronics"),
+     *                  @OA\Property(property="image", type="string", format="binary", description="صورة المنتج"),
+     *                  @OA\Property(property="initial_stock", type="integer", example=50)
+     *              )
+     *          )
+     *      ),
+     *      @OA\Response(response=201, description="تم إنشاء المنتج بنجاح"),
+     *      @OA\Response(response=422, description="خطأ في التحقق من صحة البيانات"),
+     *      @OA\Response(response=503, description="تم إلغاء إنشاء المنتج لأن خدمة المخزون غير متاحة")
+     * )
+     */
     // إضافة منتج جديد (للأدمن)
     public function store(Request $request)
     {

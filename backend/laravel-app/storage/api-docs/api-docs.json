@@ -1,0 +1,20 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "E-commerce Microservices API",
+        "description": "API Documentation for Laravel & Java gRPC Inventory microservices",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/api": {}
+    },
+    "components": {
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "bearerFormat": "JWT",
+                "scheme": "bearer"
+            }
+        }
+    }
+}

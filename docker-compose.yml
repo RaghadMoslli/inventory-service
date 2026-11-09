@@ -17,6 +17,25 @@ services:
       timeout: 5s
       retries: 10
 
+  # --- [إضافة حاوية Read Replica] ---
+  db-replica:
+    image: postgres:15-alpine
+    container_name: ecommerce_db_replica
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ecommerce_platform
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secretpassword
+    ports:
+      - "5434:5432" # منفذ خارجي مختلف حتى لا يتضارب مع 5432
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ecommerce_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   inventory-db:
     image: postgres:15-alpine
     container_name: inventory_postgres
@@ -67,7 +86,9 @@ services:
       APP_DEBUG: "true"
       APP_KEY: base64:2fl+KtvkdphvQyE8mQqGqzqJb0n5nFqJkqYk3n7p0aE=
       DB_CONNECTION: pgsql
-      DB_HOST: db
+      DB_HOST: db                       # السيرفر الرئيسي افتراضياً
+      DB_WRITE_HOST: db                 # سيرفر الكتابة
+      DB_READ_HOST: db-replica          # سيرفر القراءة (الـ Replica)
       DB_PORT: 5432
       DB_DATABASE: ecommerce_platform
       DB_USERNAME: postgres
@@ -76,15 +97,21 @@ services:
       INVENTORY_GRPC_PORT: 9090
       INVENTORY_GRPC_TIMEOUT_MS: 3000
       INVENTORY_DRIVER: grpc
+      PERF_DEBUG: "true"
     depends_on:
       db:
+        condition: service_healthy
+      db-replica:
         condition: service_healthy
       inventory:
         condition: service_started
     volumes:
       - ./backend/laravel-app:/var/www/html
-      - ./inventory-service/proto:/proto:ro
+      - laravel_vendor:/var/www/html/vendor
+      - ./inventory-service/proto:/proto:r
 
 volumes:
   postgres_data:
+  postgres_replica_data:   # --- [إضافة ذاكرة الحاوية الجديدة] ---
   inventory_postgres_data:
+  laravel_vendor:

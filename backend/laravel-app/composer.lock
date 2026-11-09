@@ -142,16 +142,16 @@
         },
         {
             "name": "darkaonline/l5-swagger",
-            "version": "11.3.0",
+            "version": "11.3.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/DarkaOnLine/L5-Swagger.git",
-                "reference": "3254d4b1f6ffcfb72d0b81d1349bb4e2c222fc48"
+                "reference": "e01ec3ff575f1ef081be5207be6962dcb06c84ae"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/DarkaOnLine/L5-Swagger/zipball/3254d4b1f6ffcfb72d0b81d1349bb4e2c222fc48",
-                "reference": "3254d4b1f6ffcfb72d0b81d1349bb4e2c222fc48",
+                "url": "https://api.github.com/repos/DarkaOnLine/L5-Swagger/zipball/e01ec3ff575f1ef081be5207be6962dcb06c84ae",
+                "reference": "e01ec3ff575f1ef081be5207be6962dcb06c84ae",
                 "shasum": ""
             },
             "require": {
@@ -210,7 +210,7 @@
             ],
             "support": {
                 "issues": "https://github.com/DarkaOnLine/L5-Swagger/issues",
-                "source": "https://github.com/DarkaOnLine/L5-Swagger/tree/11.3.0"
+                "source": "https://github.com/DarkaOnLine/L5-Swagger/tree/11.3.1"
             },
             "funding": [
                 {
@@ -218,8 +218,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-11-03T06:24:35+00:00",
-            "published-time": "2026-11-03T06:25:20+00:00"
+            "time": "2026-11-09T07:11:09+00:00",
+            "published-time": "2026-11-09T07:15:57+00:00"
         },
         {
             "name": "dflydev/dot-access-data",

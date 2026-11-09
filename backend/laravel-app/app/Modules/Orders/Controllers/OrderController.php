@@ -24,7 +24,7 @@ class OrderController extends Controller
 
     /**
      * @OA\Get(
-     *      path="/api/orders",
+     *      path="/api/v1/orders",
      *      summary="عرض قائمة الطلبات (للمستخدم أو المشرف)",
      *      tags={"Orders"},
      *      security={{"bearerAuth":{}}},
@@ -55,7 +55,7 @@ class OrderController extends Controller
 
     /**
      * @OA\Get(
-     *      path="/api/orders/{id}",
+     *      path="/api/v1/orders/{id}",
      *      summary="عرض تفاصيل طلب محدد",
      *      tags={"Orders"},
      *      security={{"bearerAuth":{}}},
@@ -83,7 +83,7 @@ class OrderController extends Controller
 
     /**
      * @OA\Post(
-     *      path="/api/orders",
+     *      path="/api/v1/orders",
      *      summary="إنشاء طلب جديد وحجز المخزون",
      *      tags={"Orders"},
      *      security={{"bearerAuth":{}}},
@@ -202,7 +202,7 @@ class OrderController extends Controller
 
     /**
      * @OA\Post(
-     *      path="/api/orders/{id}/cancel",
+     *      path="/api/v1/orders/{id}/cancel",
      *      summary="إلغاء الطلب وإرجاع المخزون",
      *      tags={"Orders"},
      *      security={{"bearerAuth":{}}},
@@ -244,7 +244,7 @@ class OrderController extends Controller
 
     /**
      * @OA\Patch(
-     *      path="/api/orders/{id}/status",
+     *      path="/api/v1/orders/{id}/status",
      *      summary="تحديث حالة الطلب (للمشرفين)",
      *      tags={"Orders"},
      *      security={{"bearerAuth":{}}},

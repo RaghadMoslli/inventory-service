@@ -13,7 +13,7 @@ class AuthController extends Controller
 {
     /**
      * @OA\Post(
-     *      path="/api/auth/register",
+     *      path="/api/v1/auth/register",
      *      summary="تسجيل مستخدم جديد",
      *      tags={"Auth"},
      *      @OA\RequestBody(
@@ -68,7 +68,7 @@ class AuthController extends Controller
 
     /**
      * @OA\Post(
-     *      path="/api/auth/login",
+     *      path="/api/v1/auth/login",
      *      summary="تسجيل الدخول للمستخدم",
      *      tags={"Auth"},
      *      @OA\RequestBody(
@@ -103,7 +103,7 @@ class AuthController extends Controller
 
     /**
      * @OA\Get(
-     *      path="/api/auth/me",
+     *      path="/api/v1/me",
      *      summary="جلب بيانات المستخدم الحالي المسجل دخوله",
      *      tags={"Auth"},
      *      security={{"bearerAuth":{}}},
@@ -119,7 +119,7 @@ class AuthController extends Controller
 
     /**
      * @OA\Post(
-     *      path="/api/auth/logout",
+     *      path="/api/v1/auth/logout",
      *      summary="تسجيل الخروج وإبطال التوكن",
      *      tags={"Auth"},
      *      security={{"bearerAuth":{}}},

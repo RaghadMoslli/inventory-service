@@ -155,54 +155,46 @@
                                     "200": {"description": "تم جلب تفاصيل المنتج بنجاح"},
                                     "404": {"description": "المنتج غير موجود"}
                                 }
-                            }
-                        },
-                        "/api/orders": {
-                            "get": {
-                                "tags": ["Orders"],
-                                "summary": "عرض قائمة الطلبات (للمستخدم أو المشرف)",
+                            },
+                            "patch": {
+                                "tags": ["Products"],
+                                "summary": "تحديث بيانات منتج (للمشرفين)",
                                 "security": [{"bearerAuth": []}],
                                 "parameters": [
-                                    {"name": "per_page", "in": "query", "required": false, "schema": {"type": "integer", "default": 10}}
+                                    {"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}
                                 ],
-                                "responses": {
-                                    "200": {"description": "تم جلب قائمة الطلبات بنجاح"},
-                                    "401": {"description": "غير مصرح"}
-                                }
-                            },
-                            "post": {
-                                "tags": ["Orders"],
-                                "summary": "إنشاء طلب جديد وحجز المخزون",
-                                "security": [{"bearerAuth": []}],
                                 "requestBody": {
                                     "required": true,
                                     "content": {
                                         "application/json": {
                                             "schema": {
                                                 "type": "object",
-                                                "required": ["items"],
                                                 "properties": {
-                                                    "items": {
-                                                        "type": "array",
-                                                        "items": {
-                                                            "type": "object",
-                                                            "required": ["product_id", "quantity"],
-                                                            "properties": {
-                                                                "product_id": {"type": "integer", "example": 1},
-                                                                "quantity": {"type": "integer", "example": 2}
-                                                            }
-                                                        }
-                                                    }
+                                                    "name": {"type": "string", "example": "هاتف ذكي محدث"},
+                                                    "description": {"type": "string", "example": "وصف محدث"},
+                                                    "price": {"type": "number", "format": "float", "example": 449.99},
+                                                    "category": {"type": "string", "example": "Electronics"}
                                                 }
                                             }
                                         }
                                     }
                                 },
                                 "responses": {
-                                    "201": {"description": "تم إنشاء الطلب بنجاح"},
-                                    "409": {"description": "الكمية غير كافية لبعض المنتجات"},
-                                    "503": {"description": "خدمة المخزون غير متاحة حالياً"},
-                                    "500": {"description": "فشل حفظ الطلب وتم إرجاع الكمية المحجوزة"}
+                                    "200": {"description": "تم تحديث المنتج بنجاح وإبطال الكاش"},
+                                    "404": {"description": "المنتج غير موجود"},
+                                    "422": {"description": "خطأ في التحقق من صحة البيانات"}
+                                }
+                            },
+                            "delete": {
+                                "tags": ["Products"],
+                                "summary": "حذف منتج (للأدمن)",
+                                "security": [{"bearerAuth": []}],
+                                "parameters": [
+                                    {"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}
+                                ],
+                                "responses": {
+                                    "200": {"description": "تم حذف المنتج بنجاح وإبطال الكاش"},
+                                    "404": {"description": "المنتج غير موجود"}
                                 }
                             }
                         },
@@ -221,8 +213,8 @@
                                 }
                             }
                         },
-                        "/api/orders/{id}/cancel": {
-                            "post": {
+                        "/api/v1/orders/{id}/cancel": {
+                            "patch": {
                                 "tags": ["Orders"],
                                 "summary": "إلغاء الطلب وإرجاع المخزون",
                                 "security": [{"bearerAuth": []}],

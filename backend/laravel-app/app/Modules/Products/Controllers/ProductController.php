@@ -187,4 +187,86 @@ class ProductController extends Controller
             'data' => $product
         ], 201);
     }
+
+    /**
+     * @OA\Patch(
+     *      path="/api/v1/products/{id}",
+     *      summary="تحديث بيانات منتج (للمشرفين)",
+     *      tags={"Products"},
+     *      security={{"bearerAuth":{}}},
+     *      @OA\Parameter(
+     *          name="id",
+     *          in="path",
+     *          required=true,
+     *          description="معرف المنتج",
+     *          @OA\Schema(type="integer")
+     *      ),
+     *      @OA\RequestBody(
+     *          required=true,
+     *          @OA\JsonContent(
+     *              @OA\Property(property="name", type="string", example="هاتف ذكي محدث"),
+     *              @OA\Property(property="description", type="string", example="وصف محدث"),
+     *              @OA\Property(property="price", type="number", format="float", example=449.99),
+     *              @OA\Property(property="category", type="string", example="Electronics")
+     *          )
+     *      ),
+     *      @OA\Response(response=200, description="تم تحديث المنتج بنجاح وإبطال الكاش"),
+     *      @OA\Response(response=404, description="المنتج غير موجود"),
+     *      @OA\Response(response=422, description="خطأ في التحقق من صحة البيانات")
+     * )
+     */
+    public function update(Request $request, $id)
+    {
+        $product = Product::findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'description' => 'nullable|string',
+            'price' => 'sometimes|numeric|min:0',
+            'category' => 'sometimes|string',
+        ]);
+
+        $product->update($validated);
+
+        // إبطال الكاش فوراً عند التعديل
+        Cache::forget('product_' . $id);
+        Cache::flush();
+
+        return response()->json([
+            'message' => 'تم تحديث المنتج بنجاح وإبطال الكاش',
+            'data' => $product
+        ]);
+    }
+
+    /**
+     * @OA\Delete(
+     *      path="/api/v1/products/{id}",
+     *      summary="حذف منتج (للأدمن)",
+     *      tags={"Products"},
+     *      security={{"bearerAuth":{}}},
+     *      @OA\Parameter(
+     *          name="id",
+     *          in="path",
+     *          required=true,
+     *          description="معرف المنتج",
+     *          @OA\Schema(type="integer")
+     *      ),
+     *      @OA\Response(response=200, description="تم حذف المنتج بنجاح وإبطال الكاش"),
+     *      @OA\Response(response=404, description="المنتج غير موجود")
+     * )
+     */
+    public function destroy($id)
+    {
+        $product = Product::findOrFail($id);
+        
+        $product->delete();
+
+        // إبطال الكاش فوراً عند الحذف
+        Cache::forget('product_' . $id);
+        Cache::flush();
+
+        return response()->json([
+            'message' => 'تم حذف المنتج بنجاح وإبطال الكاش'
+        ]);
+    }
 }

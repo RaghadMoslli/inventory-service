@@ -9,3 +9,5 @@ Route::get('products/{id}', [ProductController::class, 'show']);
 
 // مسارات محمية للـ Admin فقط
 Route::post('products', [ProductController::class, 'store'])->middleware(['auth:api', 'role:admin']);
+Route::patch('products/{id}', [ProductController::class, 'update'])->middleware(['auth:api', 'role:admin']);
+Route::delete('products/{id}', [ProductController::class, 'destroy'])->middleware(['auth:api', 'role:admin']);

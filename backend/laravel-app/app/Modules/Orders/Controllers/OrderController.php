@@ -7,12 +7,12 @@ use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Products\Contracts\StockProvider;
 use App\Modules\Products\Models\Product;
+use App\Support\PerfMode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use RuntimeException;
-use OpenApi\Annotations as OA;
 
 class OrderController extends Controller
 {
@@ -22,59 +22,28 @@ class OrderController extends Controller
     {
     }
 
-    /**
-     * @OA\Get(
-     *      path="/api/orders",
-     *      summary="عرض قائمة الطلبات (للمستخدم أو المشرف)",
-     *      tags={"Orders"},
-     *      security={{"bearerAuth":{}}},
-     *      @OA\Parameter(
-     *          name="per_page",
-     *          in="query",
-     *          required=false,
-     *          description="عدد العناصر في الصفحة الواحدة",
-     *          @OA\Schema(type="integer", default=10)
-     *      ),
-     *      @OA\Response(response=200, description="تم جلب قائمة الطلبات بنجاح"),
-     *      @OA\Response(response=401, description="غير مصرح")
-     * )
-     */
     public function index(Request $request)
     {
         $user = $request->user();
 
-        $query = Order::with('items')->latest();
+        $query = $this->withItems(Order::query())->latest();
         if ($user->role !== 'admin') {
             $query->where('user_id', $user->id);
         }
 
+        $orders = $query->paginate($request->integer('per_page', 10));
+        $this->addProductNames($orders->getCollection());
+
         return response()->json([
-            'data' => $query->paginate($request->integer('per_page', 10)),
+            'data' => $orders,
         ]);
     }
 
-    /**
-     * @OA\Get(
-     *      path="/api/orders/{id}",
-     *      summary="عرض تفاصيل طلب محدد",
-     *      tags={"Orders"},
-     *      security={{"bearerAuth":{}}},
-     *      @OA\Parameter(
-     *          name="id",
-     *          in="path",
-     *          required=true,
-     *          description="معرف الطلب",
-     *          @OA\Schema(type="integer")
-     *      ),
-     *      @OA\Response(response=200, description="تم جلب الطلب بنجاح"),
-     *      @OA\Response(response=403, description="غير مسموح لك بعرض هذا الطلب"),
-     *      @OA\Response(response=404, description="الطلب غير موجود")
-     * )
-     */
     public function show($id)
     {
-        $order = Order::with('items')->findOrFail($id);
+        $order = $this->withItems(Order::query())->findOrFail($id);
         $this->authorize('view', $order);
+        $this->addProductNames(collect([$order]));
 
         return response()->json([
             'data' => $order,
@@ -82,32 +51,29 @@ class OrderController extends Controller
     }
 
     /**
-     * @OA\Post(
-     *      path="/api/orders",
-     *      summary="إنشاء طلب جديد وحجز المخزون",
-     *      tags={"Orders"},
-     *      security={{"bearerAuth":{}}},
-     *      @OA\RequestBody(
-     *          required=true,
-     *          @OA\JsonContent(
-     *              required={"items"},
-     *              @OA\Property(
-     *                  property="items",
-     *                  type="array",
-     *                  @OA\Items(
-     *                      required={"product_id", "quantity"},
-     *                      @OA\Property(property="product_id", type="integer", example=1),
-     *                      @OA\Property(property="quantity", type="integer", example=2)
-     *                  )
-     *              )
-     *          )
-     *      ),
-     *      @OA\Response(response=201, description="تم إنشاء الطلب بنجاح"),
-     *      @OA\Response(response=409, description="الكمية غير كافية لبعض المنتجات"),
-     *      @OA\Response(response=503, description="خدمة المخزون غير متاحة حالياً"),
-     *      @OA\Response(response=500, description="فشل حفظ الطلب وتم إرجاع الكمية المحجوزة")
-     * )
+     * تحميل عناصر الطلب.
+     * optimized (eager_loading=ON): 3 استعلامات ثابتة (الطلبات، العناصر، المنتجات) مهما كان عدد الطلبات.
+     * baseline  (eager_loading=off): المنتجات تُحمَّل لاحقًا واحدًا واحدًا (مشكلة N+1).
      */
+    private function withItems($query)
+    {
+        return PerfMode::on('eager_loading')
+            ? $query->with('items.product:id,name')
+            : $query->with('items');
+    }
+
+    /** يضيف product_name لكل عنصر (تحتاجه صفحة الطلبات في الواجهة) */
+    private function addProductNames($orders): void
+    {
+        foreach ($orders as $order) {
+            foreach ($order->items as $item) {
+                // في وضع baseline هذا السطر يُنفّذ استعلامًا لكل عنصر (N+1)
+                $item->setAttribute('product_name', $item->product?->name);
+                $item->unsetRelation('product');
+            }
+        }
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -179,10 +145,11 @@ class OrderController extends Controller
                 return $order->load('items');
             });
         } catch (\Throwable $e) {
+            // Requirement 2: reservation succeeded but order save failed -> release
             try {
                 $this->inventoryGateway->release($reservationId);
             } catch (\Throwable) {
-                // ignore secondary failure
+                // ignore secondary failure; surface original error
             }
 
             return response()->json([
@@ -200,23 +167,6 @@ class OrderController extends Controller
         ], 201);
     }
 
-    /**
-     * @OA\Post(
-     *      path="/api/orders/{id}/cancel",
-     *      summary="إلغاء الطلب وإرجاع المخزون",
-     *      tags={"Orders"},
-     *      security={{"bearerAuth":{}}},
-     *      @OA\Parameter(
-     *          name="id",
-     *          in="path",
-     *          required=true,
-     *          description="معرف الطلب",
-     *          @OA\Schema(type="integer")
-     *      ),
-     *      @OA\Response(response=200, description="تم إلغاء الطلب وإرجاع المخزون بنجاح"),
-     *      @OA\Response(response=404, description="الطلب غير موجود")
-     * )
-     */
     public function cancel(Request $request, $id)
     {
         $order = Order::findOrFail($id);
@@ -242,30 +192,6 @@ class OrderController extends Controller
         ]);
     }
 
-    /**
-     * @OA\Patch(
-     *      path="/api/orders/{id}/status",
-     *      summary="تحديث حالة الطلب (للمشرفين)",
-     *      tags={"Orders"},
-     *      security={{"bearerAuth":{}}},
-     *      @OA\Parameter(
-     *          name="id",
-     *          in="path",
-     *          required=true,
-     *          description="معرف الطلب",
-     *          @OA\Schema(type="integer")
-     *      ),
-     *      @OA\RequestBody(
-     *          required=true,
-     *          @OA\JsonContent(
-     *              required={"status"},
-     *              @OA\Property(property="status", type="string", enum={"PENDING","CONFIRMED","SHIPPED","DELIVERED","CANCELLED"}, example="CONFIRMED")
-     *          )
-     *      ),
-     *      @OA\Response(response=200, description="تم تحديث حالة الطلب بنجاح"),
-     *      @OA\Response(response=422, description="خطأ في البيانات المدخلة")
-     * )
-     */
     public function updateStatus(Request $request, $id)
     {
         $order = Order::findOrFail($id);

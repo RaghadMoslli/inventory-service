@@ -28,7 +28,7 @@
                         }
                     ],
                     "paths": {
-                        "/api/auth/register": {
+                        "/api/v1/auth/register": {
                             "post": {
                                 "tags": ["Auth"],
                                 "summary": "تسجيل مستخدم جديد",
@@ -54,7 +54,7 @@
                                 }
                             }
                         },
-                        "/api/auth/login": {
+                        "/api/v1/auth/login": {
                             "post": {
                                 "tags": ["Auth"],
                                 "summary": "تسجيل الدخول للمستخدم",
@@ -79,7 +79,7 @@
                                 }
                             }
                         },
-                        "/api/auth/me": {
+                        "/api/v1/me": {
                             "get": {
                                 "tags": ["Auth"],
                                 "summary": "جلب بيانات المستخدم الحالي",
@@ -90,7 +90,7 @@
                                 }
                             }
                         },
-                        "/api/auth/logout": {
+                        "/api/v1/auth/logout": {
                             "post": {
                                 "tags": ["Auth"],
                                 "summary": "تسجيل الخروج وإبطال التوكن",
@@ -101,7 +101,7 @@
                                 }
                             }
                         },
-                        "/api/products": {
+                        "/api/v1/products": {
                             "get": {
                                 "tags": ["Products"],
                                 "summary": "جلب قائمة المنتجات مع الكمية المتوفرة",
@@ -123,7 +123,7 @@
                                 }
                             }
                         },
-                        "/api/products/{id}": {
+                        "/api/v1/products/{id}": {
                             "get": {
                                 "tags": ["Products"],
                                 "summary": "عرض تفاصيل منتج واحد",
@@ -136,7 +136,7 @@
                                 }
                             }
                         },
-                        "/api/orders": {
+                        "/api/v1/orders": {
                             "get": {
                                 "tags": ["Orders"],
                                 "summary": "عرض قائمة الطلبات",
@@ -155,7 +155,7 @@
                                 }
                             }
                         },
-                        "/api/orders/{id}": {
+                        "/api/v1/orders/{id}": {
                             "get": {
                                 "tags": ["Orders"],
                                 "summary": "عرض تفاصيل طلب محدد",
@@ -168,7 +168,7 @@
                                 }
                             }
                         },
-                        "/api/orders/{id}/cancel": {
+                        "/api/v1/orders/{id}/cancel": {
                             "post": {
                                 "tags": ["Orders"],
                                 "summary": "إلغاء الطلب وإرجاع المخزون",
@@ -181,7 +181,7 @@
                                 }
                             }
                         },
-                        "/api/orders/{id}/status": {
+                        "/api/v1/orders/{id}/status": {
                             "patch": {
                                 "tags": ["Orders"],
                                 "summary": "تحديث حالة الطلب (للمشرفين)",
@@ -194,7 +194,7 @@
                                 }
                             }
                         },
-                        "/api/notifications": {
+                        "/api/v1/notifications": {
                             "get": {
                                 "tags": ["Notifications"],
                                 "summary": "عرض قائمة الإشعارات الخاصة بالمستخدم",
@@ -204,7 +204,7 @@
                                 }
                             }
                         },
-                        "/api/notifications/{id}/read": {
+                        "/api/v1/notifications/{id}/read": {
                             "patch": {
                                 "tags": ["Notifications"],
                                 "summary": "تحديد الإشعار كمقروء",

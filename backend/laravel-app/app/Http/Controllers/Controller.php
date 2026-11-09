@@ -16,7 +16,7 @@ use OpenApi\Attributes as OA;
     bearerFormat: "JWT"
 )]
 #[OA\PathItem(
-    path: "/api"
+    path: "/api/v1"
 )]
 class Controller
 {

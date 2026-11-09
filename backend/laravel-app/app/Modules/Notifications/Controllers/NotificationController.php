@@ -11,7 +11,7 @@ class NotificationController extends Controller
 {
     /**
      * @OA\Get(
-     *      path="/api/notifications",
+     *      path="/api/v1/notifications",
      *      summary="عرض قائمة الإشعارات الخاصة بالمستخدم",
      *      tags={"Notifications"},
      *      security={{"bearerAuth":{}}},
@@ -36,7 +36,7 @@ class NotificationController extends Controller
 
     /**
      * @OA\Patch(
-     *      path="/api/notifications/{id}/read",
+     *      path="/api/v1/notifications/{id}/read",
      *      summary="تحديد الإشعار كمقروء",
      *      tags={"Notifications"},
      *      security={{"bearerAuth":{}}},

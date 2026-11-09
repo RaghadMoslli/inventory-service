@@ -28,7 +28,7 @@
                         }
                     ],
                     "paths": {
-                        "/api/auth/register": {
+                        "/api/v1/auth/register": {
                             "post": {
                                 "tags": ["Auth"],
                                 "summary": "تسجيل مستخدم جديد",
@@ -54,7 +54,7 @@
                                 }
                             }
                         },
-                        "/api/auth/login": {
+                        "/api/v1/auth/login": {
                             "post": {
                                 "tags": ["Auth"],
                                 "summary": "تسجيل الدخول للمستخدم",
@@ -79,7 +79,7 @@
                                 }
                             }
                         },
-                        "/api/auth/me": {
+                        "/api/v1/me": {
                             "get": {
                                 "tags": ["Auth"],
                                 "summary": "جلب بيانات المستخدم الحالي",
@@ -90,7 +90,7 @@
                                 }
                             }
                         },
-                        "/api/auth/logout": {
+                        "/api/v1/auth/logout": {
                             "post": {
                                 "tags": ["Auth"],
                                 "summary": "تسجيل الخروج وإبطال التوكن",
@@ -101,7 +101,7 @@
                                 }
                             }
                         },
-                        "/api/products": {
+                        "/api/v1/products": {
                             "get": {
                                 "tags": ["Products"],
                                 "summary": "جلب قائمة المنتجات مع الكمية المتوفرة",
@@ -116,14 +116,35 @@
                             },
                             "post": {
                                 "tags": ["Products"],
-                                "summary": "إضافة منتج جديد (للأدمن)",
+                                "summary": "إضافة منتج جديد وتحديد كميته الأولية (للمشرفين)",
                                 "security": [{"bearerAuth": []}],
+                                "requestBody": {
+                                    "required": true,
+                                    "content": {
+                                        "multipart/form-data": {
+                                            "schema": {
+                                                "type": "object",
+                                                "required": ["name", "price", "category", "initial_stock"],
+                                                "properties": {
+                                                    "name": {"type": "string", "example": "هاتف ذكي"},
+                                                    "description": {"type": "string", "example": "وصف المنتج هنا"},
+                                                    "price": {"type": "number", "format": "float", "example": 499.99},
+                                                    "category": {"type": "string", "example": "Electronics"},
+                                                    "image": {"type": "string", "format": "binary", "description": "صورة المنتج"},
+                                                    "initial_stock": {"type": "integer", "example": 50}
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
                                 "responses": {
-                                    "201": {"description": "تم إنشاء المنتج بنجاح"}
+                                    "201": {"description": "تم إنشاء المنتج بنجاح"},
+                                    "422": {"description": "خطأ في التحقق من صحة البيانات"},
+                                    "503": {"description": "تم إلغاء إنشاء المنتج لأن خدمة المخزون غير متاحة"}
                                 }
                             }
                         },
-                        "/api/products/{id}": {
+                        "/api/v1/products/{id}": {
                             "get": {
                                 "tags": ["Products"],
                                 "summary": "عرض تفاصيل منتج واحد",
@@ -139,23 +160,53 @@
                         "/api/orders": {
                             "get": {
                                 "tags": ["Orders"],
-                                "summary": "عرض قائمة الطلبات",
+                                "summary": "عرض قائمة الطلبات (للمستخدم أو المشرف)",
                                 "security": [{"bearerAuth": []}],
+                                "parameters": [
+                                    {"name": "per_page", "in": "query", "required": false, "schema": {"type": "integer", "default": 10}}
+                                ],
                                 "responses": {
-                                    "200": {"description": "تم جلب قائمة الطلبات بنجاح"}
+                                    "200": {"description": "تم جلب قائمة الطلبات بنجاح"},
+                                    "401": {"description": "غير مصرح"}
                                 }
                             },
                             "post": {
                                 "tags": ["Orders"],
                                 "summary": "إنشاء طلب جديد وحجز المخزون",
                                 "security": [{"bearerAuth": []}],
+                                "requestBody": {
+                                    "required": true,
+                                    "content": {
+                                        "application/json": {
+                                            "schema": {
+                                                "type": "object",
+                                                "required": ["items"],
+                                                "properties": {
+                                                    "items": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "object",
+                                                            "required": ["product_id", "quantity"],
+                                                            "properties": {
+                                                                "product_id": {"type": "integer", "example": 1},
+                                                                "quantity": {"type": "integer", "example": 2}
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
                                 "responses": {
                                     "201": {"description": "تم إنشاء الطلب بنجاح"},
-                                    "409": {"description": "الكمية غير كافية"}
+                                    "409": {"description": "الكمية غير كافية لبعض المنتجات"},
+                                    "503": {"description": "خدمة المخزون غير متاحة حالياً"},
+                                    "500": {"description": "فشل حفظ الطلب وتم إرجاع الكمية المحجوزة"}
                                 }
                             }
                         },
-                        "/api/orders/{id}": {
+                        "/api/v1/orders/{id}": {
                             "get": {
                                 "tags": ["Orders"],
                                 "summary": "عرض تفاصيل طلب محدد",
@@ -164,7 +215,9 @@
                                     {"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}
                                 ],
                                 "responses": {
-                                    "200": {"description": "تم جلب الطلب بنجاح"}
+                                    "200": {"description": "تم جلب الطلب بنجاح"},
+                                    "403": {"description": "غير مسموح لك بعرض هذا الطلب"},
+                                    "404": {"description": "الطلب غير موجود"}
                                 }
                             }
                         },
@@ -177,11 +230,12 @@
                                     {"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}
                                 ],
                                 "responses": {
-                                    "200": {"description": "تم إلغاء الطلب بنجاح"}
+                                    "200": {"description": "تم إلغاء الطلب وإرجاع المخزون بنجاح"},
+                                    "404": {"description": "الطلب غير موجود"}
                                 }
                             }
                         },
-                        "/api/orders/{id}/status": {
+                        "/api/v1/orders/{id}/status": {
                             "patch": {
                                 "tags": ["Orders"],
                                 "summary": "تحديث حالة الطلب (للمشرفين)",
@@ -189,12 +243,31 @@
                                 "parameters": [
                                     {"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}
                                 ],
+                                "requestBody": {
+                                    "required": true,
+                                    "content": {
+                                        "application/json": {
+                                            "schema": {
+                                                "type": "object",
+                                                "required": ["status"],
+                                                "properties": {
+                                                    "status": {
+                                                        "type": "string",
+                                                        "enum": ["PENDING", "CONFIRMED", "SHIPPED", "DELIVERED", "CANCELLED"],
+                                                        "example": "CONFIRMED"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
                                 "responses": {
-                                    "200": {"description": "تم تحديث حالة الطلب بنجاح"}
+                                    "200": {"description": "تم تحديث حالة الطلب بنجاح"},
+                                    "422": {"description": "خطأ في البيانات المدخلة"}
                                 }
                             }
                         },
-                        "/api/notifications": {
+                        "/api/v1/notifications": {
                             "get": {
                                 "tags": ["Notifications"],
                                 "summary": "عرض قائمة الإشعارات الخاصة بالمستخدم",
@@ -204,7 +277,7 @@
                                 }
                             }
                         },
-                        "/api/notifications/{id}/read": {
+                        "/api/v1/notifications/{id}/read": {
                             "patch": {
                                 "tags": ["Notifications"],
                                 "summary": "تحديد الإشعار كمقروء",

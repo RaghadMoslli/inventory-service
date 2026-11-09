@@ -15,7 +15,7 @@ class OrderServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // تسجيل مسارات الـ API الخاصة بالطلبات
-        Route::prefix('api')
+        Route::prefix('api/v1')
             ->middleware('api')
             ->group(__DIR__ . '/../Routes/api.php');
     }

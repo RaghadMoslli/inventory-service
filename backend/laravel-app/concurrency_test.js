@@ -13,7 +13,7 @@ const tokens = [
 ];
 
 export default function () {
-  const url = 'http://127.0.0.1:8000/api/orders';
+  const url = 'http://127.0.0.1:8000/api/v1/orders';
   
   const payload = JSON.stringify({
     items: [

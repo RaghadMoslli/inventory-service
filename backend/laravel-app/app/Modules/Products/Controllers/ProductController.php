@@ -20,7 +20,7 @@ class ProductController extends Controller
 
     /**
      * @OA\Get(
-     *      path="/api/products",
+     *      path="/api/v1/products",
      *      summary="جلب قائمة المنتجات مع الكمية المتوفرة",
      *      tags={"Products"},
      *      @OA\Parameter(
@@ -85,7 +85,7 @@ class ProductController extends Controller
 
     /**
      * @OA\Get(
-     *      path="/api/products/{id}",
+     *      path="/api/v1/products/{id}",
      *      summary="عرض تفاصيل منتج واحد مع كميته المتوفرة",
      *      tags={"Products"},
      *      @OA\Parameter(
@@ -128,7 +128,7 @@ class ProductController extends Controller
 
     /**
      * @OA\Post(
-     *      path="/api/products",
+     *      path="/api/v1/products",
      *      summary="إضافة منتج جديد وتحديد كميته الأولية (للمشرفين)",
      *      tags={"Products"},
      *      security={{"bearerAuth":{}}},

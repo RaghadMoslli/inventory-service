@@ -148,9 +148,57 @@ export const useProductStore = defineStore('products', {
         this.error = parsed.message
         if (parsed.status === 422) this.validationErrors = parsed.fields
         throw parsed
-      } finally {
+           } finally {
         this.saving = false
+      }
+    },
+
+    // تعديل منتج (أدمن). يرجع { product, stockSynced }
+    async updateProduct(id, payload) {
+      const errors = validateProductPayload(payload)
+      if (Object.keys(errors).length) {
+        throw { status: 422, message: 'يرجى تصحيح الحقول المظللة', fields: errors }
+      }
+
+      const fields = {
+        name: payload.name,
+        description: payload.description ?? '',
+        price: Number(payload.price),
+        category: payload.category,
+        initial_stock: Number(payload.initial_stock),
+      }
+
+      try {
+        if (payload.image instanceof File) {
+          // رفع صورة جديدة: multipart مع _method لأن PHP لا يقرأ multipart مع PATCH
+          const form = toFormData({ ...fields, image: payload.image })
+          form.append('_method', 'PATCH')
+          await api.post(`/products/${id}`, form)
+        } else {
+          await api.patch(`/products/${id}`, fields)
+        }
+      } catch (error) {
+        throw parseApiError(error)
+      }
+
+      // رد الـ PATCH لا يحتوي الكمية، فنجلبها من الباك (يقرأها من Inventory Service)
+      const fresh = await this.fetchProductDetails(id, { silent: true })
+      const stockSynced = !fresh || Number(fresh.available_quantity) === fields.initial_stock
+      return { product: fresh, stockSynced }
+    },
+
+    // حذف منتج (أدمن)
+    async deleteProduct(id) {
+      try {
+        const { data } = await api.delete(`/products/${id}`)
+        this.products = this.products.filter((p) => p.id !== id)
+        delete this.byId[id]
+        this.meta.total = Math.max(0, this.meta.total - 1)
+        return data?.message || 'تم حذف المنتج بنجاح'
+      } catch (error) {
+        throw parseApiError(error)
       }
     },
   },
 })
+    

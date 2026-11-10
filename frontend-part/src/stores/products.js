@@ -36,71 +36,96 @@ function toFormData(payload) {
   return form
 }
 
+const clean = (params) =>
+  Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== ''))
+
+let listRequest = null
+let listKey = ''
+
 export const useProductStore = defineStore('products', {
   state: () => ({
     products: [],
+    byId: {}, 
     currentProduct: null,
+    loaded: false,
     loading: false,
-    error: null, 
+    saving: false,
+    detailLoading: false,
+    detailError: null,
+    error: null,
     validationErrors: {},
-    meta: {
-      current_page: 1,
-      per_page: 10,
-      total: 0,
-      last_page: 1
-    }
+    meta: { current_page: 1, per_page: 12, total: 0, last_page: 1 },
   }),
 
-  getters: {
-    availableProducts: (state) => state.products.filter((p) => p.available_quantity > 0)
-  },
-
   actions: {
-    async fetchProducts(params = {}) {
-      this.loading = true
-      this.error = null
+    // silent = تحديث بالخلفية: لا يمسح القائمة الحالية ولا يظهر مؤشر تحميل
+    async fetchProducts(params = {}, { silent = false } = {}) {
+      const key = JSON.stringify(params)
+      if (listRequest && listKey === key) return listRequest
+      if (!silent || !this.loaded) this.loading = true
+      listKey = key
+
+      listRequest = (async () => {
+        try {
+          const { data: body } = await api.get('/products', { params: clean(params) })
+          const rows = Array.isArray(body) ? body : body.data ?? []
+          this.products = rows
+          rows.forEach((p) => { this.byId[p.id] = p })
+          this.meta = {
+            current_page: body.current_page ?? 1,
+            per_page: body.per_page ?? this.meta.per_page,
+            total: body.total ?? rows.length,
+            last_page: body.last_page ?? 1,
+          }
+          this.loaded = true
+          this.error = null
+          return true
+        } catch (error) {
+          const message = parseApiError(error).message
+          if (!silent || !this.products.length) this.error = message
+          return false
+        } finally {
+          this.loading = false
+          listRequest = null
+        }
+      })()
+      return listRequest
+    },
+
+    async fetchProductDetails(id, { silent = false } = {}) {
+      if (!silent) this.detailLoading = true
+      this.detailError = null
       try {
-        const response = await api.get('/products', { params })
-        const body = response.data
-
-        this.products = Array.isArray(body) ? body : body.data ?? []
-
-        const m = body.meta ?? (body.last_page ? body : null)
-        this.meta = m
-          ? {
-              current_page: m.current_page ?? 1,
-              per_page: m.per_page ?? this.meta.per_page,
-              total: m.total ?? this.products.length,
-              last_page: m.last_page ?? 1
-            }
-          : { ...this.meta, current_page: 1, last_page: 1, total: this.products.length }
-
-        return true
+        const { data } = await api.get(`/products/${id}`)
+        const product = data.data ?? data
+        this.byId[product.id] = product
+        this.currentProduct = product
+        return product
       } catch (error) {
-        this.error = parseApiError(error).message
-        return false
+        this.detailError = parseApiError(error).message
+        return null
       } finally {
-        this.loading = false
+        this.detailLoading = false
       }
     },
 
-    async fetchProductDetails(id) {
-      this.loading = true
-      this.error = null
-      try {
-        const response = await api.get(`/products/${id}`)
-        this.currentProduct = response.data.data ?? response.data
-        return this.currentProduct
-      } catch (error) {
-        this.error = parseApiError(error).message
-        return null
-      } finally {
-        this.loading = false
-      }
+    // جلب أسماء/صور المنتجات الموجودة داخل الطلبات (الباك يرجع product_id فقط)
+    async resolveProducts(ids) {
+      const missing = [...new Set(ids)].filter((id) => !this.byId[id])
+      await Promise.allSettled(
+        missing.map(async (id) => {
+          try {
+            const { data } = await api.get(`/products/${id}`)
+            this.byId[id] = data.data ?? data
+          } catch (error) {
+            if (error.response?.status === 404) this.byId[id] = { id, name: null, deleted: true }
+          }
+        })
+      )
     },
 
     async createProduct(payload) {
-      this.loading = true
+      this.saving = true
       this.error = null
       this.validationErrors = {}
 
@@ -108,22 +133,24 @@ export const useProductStore = defineStore('products', {
         const errors = validateProductPayload(payload)
         if (Object.keys(errors).length) {
           this.validationErrors = errors
-          this.loading = false
-          throw { errors }
+          this.saving = false
+          throw { status: 422, message: 'يرجى تصحيح الحقول المظللة', fields: errors }
         }
       }
 
       try {
-        const response = await api.post('/products', toFormData(payload))
-        return response.data.data ?? response.data
+        const { data } = await api.post('/products', toFormData(payload))
+        const product = data.data ?? data
+        this.byId[product.id] = product
+        return product
       } catch (error) {
         const parsed = parseApiError(error)
         this.error = parsed.message
         if (parsed.status === 422) this.validationErrors = parsed.fields
-        throw error.response?.data || error.message
+        throw parsed
       } finally {
-        this.loading = false
+        this.saving = false
       }
-    }
-  }
+    },
+  },
 })

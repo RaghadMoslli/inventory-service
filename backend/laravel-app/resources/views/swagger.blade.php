@@ -198,6 +198,55 @@
                                 }
                             }
                         },
+                       "/api/v1/orders": {
+                            "get": {
+                                "tags": ["Orders"],
+                                "summary": "عرض قائمة الطلبات (للمستخدم أو المشرف)",
+                                "security": [{"bearerAuth": []}],
+                                "parameters": [
+                                    {"name": "per_page", "in": "query", "required": false, "schema": {"type": "integer", "default": 10}}
+                                ],
+                                "responses": {
+                                    "200": {"description": "تم جلب قائمة الطلبات بنجاح"},
+                                    "401": {"description": "غير مصرح"}
+                                }
+                            },
+                            "post": {
+                                "tags": ["Orders"],
+                                "summary": "إنشاء طلب جديد وحجز المخزون",
+                                "security": [{"bearerAuth": []}],
+                                "requestBody": {
+                                    "required": true,
+                                    "content": {
+                                        "application/json": {
+                                            "schema": {
+                                                "type": "object",
+                                                "required": ["items"],
+                                                "properties": {
+                                                    "items": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "object",
+                                                            "required": ["product_id", "quantity"],
+                                                            "properties": {
+                                                                "product_id": {"type": "integer", "example": 1},
+                                                                "quantity": {"type": "integer", "example": 2}
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "responses": {
+                                    "201": {"description": "تم إنشاء الطلب بنجاح"},
+                                    "409": {"description": "الكمية غير كافية لبعض المنتجات"},
+                                    "503": {"description": "خدمة المخزون غير متاحة حالياً"},
+                                    "500": {"description": "فشل حفظ الطلب وتم إرجاع الكمية المحجوزة"}
+                                }
+                            }
+                        },
                         "/api/v1/orders/{id}": {
                             "get": {
                                 "tags": ["Orders"],
@@ -256,16 +305,6 @@
                                 "responses": {
                                     "200": {"description": "تم تحديث حالة الطلب بنجاح"},
                                     "422": {"description": "خطأ في البيانات المدخلة"}
-                                }
-                            }
-                        },
-                        "/api/v1/notifications": {
-                            "get": {
-                                "tags": ["Notifications"],
-                                "summary": "عرض قائمة الإشعارات الخاصة بالمستخدم",
-                                "security": [{"bearerAuth": []}],
-                                "responses": {
-                                    "200": {"description": "تم جلب الإشعارات بنجاح"}
                                 }
                             }
                         },

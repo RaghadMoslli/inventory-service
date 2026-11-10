@@ -155,8 +155,15 @@ class OrderController extends Controller
             ], 409);
         }
 
-$reservationId = $reservation['reservation_id'] ?? $reservation['reservationId'] ?? $requestId;
-        \Illuminate\Support\Facades\Log::info('Reservation response data:', (array) $reservation);
+        $reservationId = $reservation['reservation_id'] ?? $reservation['reservationId'] ?? null;
+        if (! $reservationId) {
+            return response()->json([
+                'error' => [
+                    'code' => 'INVENTORY_UNAVAILABLE',
+                    'message' => 'تم الحجز لكن لم يُرجع رقم الحجز من خدمة المخزون',
+                ],
+            ], 503);
+        }
         try {
             $order = DB::transaction(function () use ($request, $validated, $products, $total, $reservationId, $productIds) {
                 $order = Order::create([
@@ -262,21 +269,33 @@ $reservationId = $reservation['reservation_id'] ?? $reservation['reservationId']
             ]);
         }
 
-        DB::transaction(function () use ($order, $request) {
-            if ($order->reservation_id) {
-                $this->inventoryGateway->release($order->reservation_id);
-            }
-            $order->update(['status' => 'CANCELLED']);
+        try {
+            DB::transaction(function () use ($order) {
+                if ($order->reservation_id) {
+                    $released = $this->inventoryGateway->release($order->reservation_id);
+                    if (! $released) {
+                        throw new RuntimeException('Inventory release returned false for reservation '.$order->reservation_id);
+                    }
+                }
+                $order->update(['status' => 'CANCELLED']);
 
-            // 🔔 إشعار عند إلغاء الطلب
-           DB::table('notifications')->insert([
-    'user_id' => $order->user_id,
-    'type' => 'OrderCancelled',
-    'message' => 'تم إلغاء الطلب رقم #' . $order->id . ' بنجاح وإرجاع المخزون.',
-    'created_at' => now(),
-    'updated_at' => now(),
-]);
-        });
+                DB::table('notifications')->insert([
+                    'user_id' => $order->user_id,
+                    'type' => 'OrderCancelled',
+                    'message' => 'تم إلغاء الطلب رقم #'.$order->id.' بنجاح وإرجاع المخزون.',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            });
+        } catch (RuntimeException $e) {
+            return response()->json([
+                'error' => [
+                    'code' => 'INVENTORY_UNAVAILABLE',
+                    'message' => 'تعذر إرجاع المخزون، لم يتم إلغاء الطلب',
+                    'details' => $e->getMessage(),
+                ],
+            ], 503);
+        }
 
         return response()->json([
             'message' => 'تم إلغاء الطلب وإرجاع المخزون',
@@ -319,26 +338,38 @@ $reservationId = $reservation['reservation_id'] ?? $reservation['reservationId']
 
         $newStatus = $request->status;
 
-        DB::transaction(function () use ($order, $newStatus) {
-            if ($newStatus === 'CANCELLED' && $order->status !== 'CANCELLED') {
-                if ($order->reservation_id) {
-                    $this->inventoryGateway->release($order->reservation_id);
+        try {
+            DB::transaction(function () use ($order, $newStatus) {
+                if ($newStatus === 'CANCELLED' && $order->status !== 'CANCELLED') {
+                    if ($order->reservation_id) {
+                        $released = $this->inventoryGateway->release($order->reservation_id);
+                        if (! $released) {
+                            throw new RuntimeException('Inventory release returned false for reservation '.$order->reservation_id);
+                        }
+                    }
                 }
-            }
 
-            $order->update([
-                'status' => $newStatus,
-            ]);
+                $order->update([
+                    'status' => $newStatus,
+                ]);
 
-            // 🔔 إشعار عند تحديث حالة الطلب من قِبل المشرف
-           DB::table('notifications')->insert([
-    'user_id' => $order->user_id,
-    'type' => 'OrderStatusUpdated',
-    'message' => 'تم تغيير حالة طلبك رقم #' . $order->id . ' إلى: ' . $newStatus,
-    'created_at' => now(),
-    'updated_at' => now(),
-]);
-        });
+                DB::table('notifications')->insert([
+                    'user_id' => $order->user_id,
+                    'type' => 'OrderStatusUpdated',
+                    'message' => 'تم تغيير حالة طلبك رقم #'.$order->id.' إلى: '.$newStatus,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            });
+        } catch (RuntimeException $e) {
+            return response()->json([
+                'error' => [
+                    'code' => 'INVENTORY_UNAVAILABLE',
+                    'message' => 'تعذر إرجاع المخزون، لم يتم تحديث حالة الطلب',
+                    'details' => $e->getMessage(),
+                ],
+            ], 503);
+        }
 
         return response()->json([
             'message' => 'تم تحديث حالة الطلب بنجاح',

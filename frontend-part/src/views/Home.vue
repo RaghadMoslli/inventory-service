@@ -3,11 +3,14 @@ import { ref, computed } from 'vue'
 import Icon from '../components/Icon.vue'
 import ProductCard from '../components/ProductCard.vue'
 import ProductModal from '../components/ProductModal.vue'
+import ProductEditModal from '../components/ProductEditModal.vue'
 import EmptyState from '../components/EmptyState.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import { useProductStore } from '../stores/products'
 import { useOrderStore } from '../stores/orders'
 import { useAuthStore } from '../stores/auth'
+import { useCartStore } from '../stores/cart'
+import { formatMoney } from '../utils/format'
 import { useUiStore } from '../stores/ui'
 import { useAutoRefresh } from '../composables/useAutoRefresh'
 import { BASE_CATEGORIES, categoryLabel } from '../utils/constants'
@@ -16,11 +19,12 @@ const PER_PAGE = 12
 const products = useProductStore()
 const orders = useOrderStore()
 const auth = useAuthStore()
+const cart = useCartStore()
 const ui = useUiStore()
 
 const selectedCategory = ref('')
 const selectedProduct = ref(null)
-
+const editingProduct = ref(null)
 // التصنيفات الأساسية + أي تصنيف جديد أضافه الأدمن
 const categories = computed(() => {
   const found = Object.values(products.byId).map((p) => p.category).filter(Boolean)
@@ -37,6 +41,23 @@ useAutoRefresh(() => load(), 30000)
 function filterBy(category) {
   selectedCategory.value = category
   load(1, false)
+}
+function openEdit(p) {
+  if (auth.isAdmin) editingProduct.value = p
+}
+
+async function askDelete(p) {
+  if (!auth.isAdmin) return
+  if (!window.confirm(`هل أنت متأكد من حذف «${p.name}»؟ لا يمكن التراجع عن هذا الإجراء.`)) return
+  try {
+    const message = await products.deleteProduct(p.id)
+    ui.success(message)
+    await load()
+    // إذا فرغت الصفحة الحالية بعد الحذف نرجع للصفحة السابقة
+    if (!products.products.length && (products.meta.current_page || 1) > 1) load(products.meta.current_page - 1, false)
+  } catch (err) {
+    ui.error(err.message)
+  }
 }
 
 function onOrdered() {
@@ -87,11 +108,19 @@ function onOrdered() {
     <template v-else>
       <p v-if="products.error" class="rounded-xl bg-amber-950/30 border border-amber-800/60 text-amber-300 text-xs px-4 py-3">تعذّر تحديث القائمة، تُعرض آخر بيانات محمّلة.</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 transition-opacity" :class="{ 'opacity-60': products.loading }">
-        <ProductCard v-for="p in products.products" :key="p.id" :product="p" @open="selectedProduct = $event" />
-      </div>
+<ProductCard v-for="p in products.products" :key="p.id" :product="p" @open="selectedProduct = $event" @edit="openEdit" @remove="askDelete" />      </div>
       <PaginationBar :current="products.meta.current_page" :last="products.meta.last_page" :disabled="products.loading" @change="(p) => load(p, false)" />
     </template>
+<router-link
+      v-if="!auth.isAdmin && cart.count"
+      to="/cart"
+      class="fixed bottom-5 inset-x-0 mx-auto w-max max-w-[calc(100%-2rem)] z-40 flex items-center gap-4 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-2xl shadow-purple-600/40 ps-5 pe-2 py-2 text-sm font-bold"
+    >
+      <Icon name="cart" size="w-5 h-5" />
+      <span>{{ cart.count }} قطعة — {{ formatMoney(cart.total) }}</span>
+      <span class="bg-white/20 rounded-full px-4 py-2">عرض السلة وتأكيد الطلب</span>
+    </router-link>
 
-    <ProductModal :product="selectedProduct" @close="selectedProduct = null" @ordered="onOrdered" />
-  </div>
+<ProductModal :product="selectedProduct" @close="selectedProduct = null" @ordered="onOrdered" />
+    <ProductEditModal v-if="auth.isAdmin" :product="editingProduct" @close="editingProduct = null" @saved="load()" />  </div>
 </template>

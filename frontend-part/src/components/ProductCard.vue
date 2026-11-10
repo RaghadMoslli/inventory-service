@@ -10,8 +10,7 @@ const props = defineProps({
   previewUrl: { type: String, default: null }, // لمعاينة صورة لم تُرفع بعد (صفحة الأدمن)
   readonly: Boolean,
 })
-const emit = defineEmits(['open'])
-
+const emit = defineEmits(['open', 'edit', 'remove'])
 const broken = ref(false)
 const src = computed(() => props.previewUrl || imageUrl(props.product.image_path))
 const stock = computed(() => Number(props.product.available_quantity ?? 0))
@@ -46,8 +45,13 @@ const stockInfo = computed(() => {
         </div>
     <button v-if="!readonly" class="btn btn-primary w-full text-xs" @click="emit('open', product)">
   <Icon name="cart" size="w-4 h-4" />
-  {{ authStore.isAdmin ? 'عرض التفاصيل' : (stock > 0 ? 'التفاصيل والطلب' : 'عرض التفاصيل') }}
+  {{ authStore.isAdmin ? 'عرض التفاصيل' : (stock > 0 ? 'عرض وإضافة للسلة' : 'عرض التفاصيل') }}
 </button>
+ <!-- أزرار الأدمن فقط -->
+        <div v-if="authStore.isAdmin && !readonly" class="grid grid-cols-2 gap-2 mt-2">
+          <button class="btn btn-ghost text-xs" @click="emit('edit', product)">تعديل</button>
+          <button class="btn text-xs bg-rose-500/10 text-rose-300 border border-rose-500/25 hover:bg-rose-500/20" @click="emit('remove', product)">حذف</button>
+        </div>
       </div>
     </div>
   </article>

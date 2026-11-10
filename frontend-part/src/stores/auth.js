@@ -4,7 +4,7 @@ import { parseApiError } from '../utils/apiError'
 import { useOrderStore } from './orders'
 import { useProductStore } from './products'
 import { useNotificationStore } from './notifications'
-
+import { useCartStore } from './cart'
 const LOCK_KEY = 'login_lock_until'
 
 function readUser() {
@@ -36,7 +36,7 @@ export const useAuthStore = defineStore('auth', {
       useOrderStore().$reset()
       useProductStore().$reset()
       useNotificationStore().$reset()
-    },
+      useCartStore().$reset()    },
     setLock(timestamp) {
       this.lockUntil = timestamp
       if (timestamp) localStorage.setItem(LOCK_KEY, String(timestamp))
@@ -46,7 +46,8 @@ export const useAuthStore = defineStore('auth', {
       try {
         const { data } = await api.post('/auth/login', credentials)
         this.setSession(data.access_token || data.token, data.user)
-        this.setLock(0)
+               this.setLock(0)
+        useCartStore().load()
         return data.user
       } catch (error) {
         const parsed = parseApiError(error)

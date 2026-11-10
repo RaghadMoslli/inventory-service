@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use OpenApi\Annotations as OA;
 use RuntimeException;
 
 class OrderController extends Controller
@@ -89,7 +90,27 @@ class OrderController extends Controller
      * تحميل عناصر الطلب.
      * optimized (eager_loading=ON): 3 استعلامات ثابتة (الطلبات، العناصر، المنتجات) مهما كان عدد الطلبات.
      * baseline  (eager_loading=off): المنتجات تُحمَّل لاحقًا واحدًا واحدًا (مشكلة N+1).
-     * 
+     */
+    private function withItems($query)
+    {
+        return PerfMode::on('eager_loading')
+            ? $query->with('items.product:id,name')
+            : $query->with('items');
+    }
+
+    /** يضيف product_name لكل عنصر (تحتاجه صفحة الطلبات في الواجهة) */
+    private function addProductNames($orders): void
+    {
+        foreach ($orders as $order) {
+            foreach ($order->items as $item) {
+                // في وضع baseline هذا السطر يُنفّذ استعلامًا لكل عنصر (N+1)
+                $item->setAttribute('product_name', $item->product?->name);
+                $item->unsetRelation('product');
+            }
+        }
+    }
+
+    /**
      * @OA\Post(
      *      path="/api/v1/orders",
      *      summary="إنشاء طلب جديد وحجز المخزون",
@@ -116,25 +137,6 @@ class OrderController extends Controller
      *      @OA\Response(response=500, description="فشل حفظ الطلب وتم إرجاع الكمية المحجوزة")
      * )
      */
-    private function withItems($query)
-    {
-        return PerfMode::on('eager_loading')
-            ? $query->with('items.product:id,name')
-            : $query->with('items');
-    }
-
-    /** يضيف product_name لكل عنصر (تحتاجه صفحة الطلبات في الواجهة) */
-    private function addProductNames($orders): void
-    {
-        foreach ($orders as $order) {
-            foreach ($order->items as $item) {
-                // في وضع baseline هذا السطر يُنفّذ استعلامًا لكل عنصر (N+1)
-                $item->setAttribute('product_name', $item->product?->name);
-                $item->unsetRelation('product');
-            }
-        }
-    }
-
     public function store(Request $request)
     {
         $validated = $request->validate([

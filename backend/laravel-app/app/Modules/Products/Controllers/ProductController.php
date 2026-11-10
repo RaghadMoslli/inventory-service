@@ -6,16 +6,21 @@ use App\Http\Controllers\Controller;
 use App\Modules\Products\Contracts\StockProvider;
 use App\Modules\Products\Models\Product;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
+use App\Modules\Products\Services\ProductCacheService;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use OpenApi\Annotations as OA;
 
 class ProductController extends Controller
 {
     protected StockProvider $stockProvider;
 
-    public function __construct(StockProvider $stockProvider)
+    protected ProductCacheService $cache;
+
+    public function __construct(StockProvider $stockProvider, ProductCacheService $cache)
     {
         $this->stockProvider = $stockProvider;
+        $this->cache = $cache;
     }
 
     /**
@@ -43,24 +48,33 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        $perPage = $request->get('per_page', 10);
-        $category = $request->get('category', 'all');
-        $page = $request->get('page', 1);
+        $perPage = max(1, (int) $request->get('per_page', 10));
+        $category = $request->has('category') ? (string) $request->category : null;
+        $page = max(1, (int) Paginator::resolveCurrentPage());
 
-        // مفتاح كاش فريد يعتمد على التصنيف وعدد العناصر ورقم الصفحة
-        $cacheKey = "products_page_{$page}_{$perPage}_category_{$category}";
+        // نخزّن صفوف المنتجات فقط (بدون الكمية المتوفرة): المفتاح يحمل رقم إصدار الكاش، فيبطل بتعديل أي منتج
+        $cached = $this->cache->remember(
+            $this->cache->listKey($category, $page, $perPage),
+            function () use ($category, $perPage, $page) {
+                $query = Product::query();
+                if ($category !== null) {
+                    $query->where('category', $category);
+                }
+                if ($this->cache->mustReadFromPrimary()) {
+                    $query->useWritePdo();   // الـ Replica قد تكون متأخرة: لا نخزّن منها بيانات قديمة
+                }
+                $p = $query->orderBy('id')->paginate($perPage, ['*'], 'page', $page);
 
-        // **تخزين القائمة في Redis باستخدام Cache::remember (لمدة 60 دقيقة)**
-        $products = Cache::remember($cacheKey, 3600, function () use ($request) {
-            $query = Product::query();
-
-            if ($request->has('category')) {
-                $query->where('category', $request->category);
+                return ['items' => $p->getCollection(), 'total' => $p->total()];
             }
+        );
 
-            return $query->orderBy('id')->paginate($request->get('per_page', 10));
-        });
-        
+        // نعيد بناء الـ paginator فيبقى شكل الرد (data, links, meta) مطابقًا تمامًا للأصل
+        $products = new LengthAwarePaginator($cached['items'], $cached['total'], $perPage, $page, [
+            'path' => Paginator::resolveCurrentPath(),
+            'pageName' => 'page',
+        ]);
+
         $productIds = $products->pluck('id')->toArray();
         
         try {
@@ -102,10 +116,15 @@ class ProductController extends Controller
      */
     public function show($id)
     {
-        // **تخزين تفاصيل المنتج الواحد أيضاً في Redis**
-        $product = Cache::remember("product_{$id}", 3600, function () use ($id) {
-            return Product::findOrFail($id);
+        $product = $this->cache->remember($this->cache->itemKey((int) $id), function () use ($id) {
+            $query = Product::query();
+            if ($this->cache->mustReadFromPrimary()) {
+                $query->useWritePdo();
+            }
+
+            return $query->find($id);   // null لا يُخزَّن في الكاش
         });
+        abort_if($product === null, 404);
 
         try {
             $stocks = $this->stockProvider->getStock([$product->id]);
@@ -190,9 +209,6 @@ class ProductController extends Controller
             ], 503);
         }
 
-        // إبطال الكاش فوراً عند إضافة منتج جديد
-        Cache::flush();
-
         return response()->json([
             'message' => 'تم إنشاء المنتج بنجاح',
             'data' => $product
@@ -201,7 +217,7 @@ class ProductController extends Controller
 
     /**
      * @OA\Patch(
-     *      path="/api/products/{id}",
+     *      path="/api/v1/products/{id}",
      *      summary="تعديل منتج (للأدمن)",
      *      tags={"Products"},
      *      security={{"bearerAuth":{}}},
@@ -222,19 +238,17 @@ class ProductController extends Controller
 
         $product->update($validated);
 
-        // إبطال الكاش فوراً عند التعديل
-        Cache::forget('product_' . $id);
-        Cache::flush();
+        // إبطال الكاش يتم تلقائيًا في ProductObserver (saved)
 
         return response()->json([
-            'message' => 'تم تحديث المنتج بنجاح وإبطال الكاش',
+            'message' => 'تم تحديث المنتج بنجاح',
             'data' => $product
         ]);
     }
 
     /**
      * @OA\Delete(
-     *      path="/api/products/{id}",
+     *      path="/api/v1/products/{id}",
      *      summary="حذف منتج (للأدمن)",
      *      tags={"Products"},
      *      security={{"bearerAuth":{}}},
@@ -248,12 +262,10 @@ class ProductController extends Controller
         
         $product->delete();
 
-        // إبطال الكاش فوراً عند الحذف
-        Cache::forget('product_' . $id);
-        Cache::flush();
+        // إبطال الكاش يتم تلقائيًا في ProductObserver (deleted)
 
         return response()->json([
-            'message' => 'تم حذف المنتج بنجاح وإبطال الكاش'
+            'message' => 'تم حذف المنتج بنجاح'
         ]);
     }
 }

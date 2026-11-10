@@ -156,6 +156,9 @@ class PerfSeedCommand extends Command
             }
         });
 
+        // الإدخال الجماعي يتجاوز Eloquent (فلا يعمل Observer) فنبطل كاش المنتجات يدويًا
+        app(\App\Modules\Products\Services\ProductCacheService::class)->invalidate();
+
         $this->summary();
 
         return self::SUCCESS;

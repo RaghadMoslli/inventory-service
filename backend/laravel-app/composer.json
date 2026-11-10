@@ -11,7 +11,8 @@
         "knuckleswtf/scribe": "^5.11",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
-        "php-open-source-saver/jwt-auth": "^2.7"
+        "php-open-source-saver/jwt-auth": "^2.7",
+        "predis/predis": "^3.7"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

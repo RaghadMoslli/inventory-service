@@ -39,6 +39,12 @@ return [
         'order_items_product_id_idx'      => ['order_items', 'product_id'],
     ],
 
+    // مدة صلاحية الكاش بالثواني (الإبطال الفوري يتم عند أي تعديل، والـ TTL شبكة أمان فقط)
+    'cache_ttl' => (int) env('PERF_CACHE_TTL', 600),
+
+    // بعد أي كتابة يُجبَر نفس المستخدم على القراءة من الـ Primary لهذه المدة (ثوانٍ) = Read-Your-Writes
+    'ryw_ttl' => (int) env('PERF_RYW_TTL', 5),
+
     // تصنيفات المنتجات المولّدة (الأولى أكثر شيوعًا لتوزيع واقعي)
     'categories' => [
         'Electronics', 'Clothing', 'Books', 'Home', 'Toys',

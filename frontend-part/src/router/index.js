@@ -12,7 +12,7 @@ const routes = [
     children: [
       { path: '', name: 'Home', component: () => import('../views/Home.vue'), meta: { title: 'المنتجات' } },
       { path: 'orders', name: 'Orders', component: () => import('../views/Orders.vue'), meta: { title: 'الطلبات' } },
-      {
+      { path: 'cart', name: 'Cart', component: () => import('../views/Cart.vue'), meta: { requiresUser: true, title: 'السلة' } },      {
         path: 'admin/products/create',
         name: 'AdminAddProduct',
         component: () => import('../views/AdminAddProduct.vue'),
@@ -36,7 +36,7 @@ router.beforeEach((to) => {
   }
   if (guestOnly && auth.isAuthenticated) return { name: 'Home' }
   if (needsAdmin && !auth.isAdmin) return { name: 'Home' }
-  return true
+  if (to.matched.some((r) => r.meta.requiresUser) && auth.isAdmin) return { name: 'Home' } // الأدمن لا يملك سلة  return true
 })
 
 router.afterEach((to) => {

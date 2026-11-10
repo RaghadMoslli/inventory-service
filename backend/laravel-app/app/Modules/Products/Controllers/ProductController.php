@@ -224,6 +224,8 @@ class ProductController extends Controller
             'description' => 'nullable|string',
             'price' => 'sometimes|numeric|min:0',
             'category' => 'sometimes|string',
+            'image' => 'nullable',
+            'initial_stock' => 'sometimes|integer|min:0',
         ]);
 
         $product->update($validated);

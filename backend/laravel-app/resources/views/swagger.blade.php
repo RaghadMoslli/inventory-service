@@ -173,7 +173,9 @@
                                                     "name": {"type": "string", "example": "هاتف ذكي محدث"},
                                                     "description": {"type": "string", "example": "وصف محدث"},
                                                     "price": {"type": "number", "format": "float", "example": 449.99},
-                                                    "category": {"type": "string", "example": "Electronics"}
+                                                    "category": {"type": "string", "example": "Electronics"},
+                                                    "image": {"type": "string", "format": "binary", "description": "صورة المنتج"},
+                                                    "initial_stock": {"type": "integer", "example": 50}
                                                 }
                                             }
                                         }

@@ -7,7 +7,7 @@ use App\Modules\Products\Contracts\StockProvider;
 use App\Modules\Products\Models\Product;
 use Illuminate\Http\Request;
 use OpenApi\Annotations as OA;
-
+use Illuminate\Support\Facades\Cache;
 class ProductController extends Controller
 {
     protected StockProvider $stockProvider;

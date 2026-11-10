@@ -61,9 +61,11 @@ watch(signature, () => { for (const k of Object.keys(drafts)) delete drafts[k] }
                     >
                       <img v-if="imageUrl(productOf(item.product_id)?.image_path)" :src="imageUrl(productOf(item.product_id).image_path)" alt="" class="w-full h-full object-cover" />
                       <Icon v-else name="cube" size="w-4 h-4" />
-                    </span>
+                                   </span>
                   </span>
-                  <span class="text-xs text-slate-400">{{ countOf(o) }} قطعة</span>
+                  <span class="text-xs text-slate-300 max-w-[14rem] truncate" :title="(o.items || []).map(nameOf).join('، ')">
+                    {{ (o.items || []).map(nameOf).join('، ') }} <span class="text-slate-500">({{ countOf(o) }} قطعة)</span>
+                  </span>
                 </div>
               </td>
               <td class="p-4 font-bold text-emerald-400 whitespace-nowrap">{{ formatMoney(o.total_amount) }}</td>

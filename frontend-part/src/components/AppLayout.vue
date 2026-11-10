@@ -5,9 +5,10 @@ import Icon from './Icon.vue'
 import NotificationBell from './NotificationBell.vue'
 import { useAuthStore } from '../stores/auth'
 import { useNotificationStore } from '../stores/notifications'
-
+import { useCartStore } from '../stores/cart'
 const auth = useAuthStore()
 const notifications = useNotificationStore()
+const cart = useCartStore()
 const router = useRouter()
 const loggingOut = ref(false)
 
@@ -17,7 +18,8 @@ const links = computed(() => {
     { to: '/orders', label: auth.isAdmin ? 'إدارة الطلبات' : 'طلباتي', icon: 'orders' },
   ]
   if (auth.isAdmin) items.push({ to: '/admin/products/create', label: 'إضافة منتج', icon: 'plus' })
-  return items
+  else items.push({ to: '/cart', label: 'السلة', icon: 'cart', badge: cart.count })
+    return items
 })
 
 async function logout() {
@@ -53,8 +55,8 @@ onBeforeUnmount(() => {
 
         <nav class="hidden md:flex items-center gap-1">
           <router-link v-for="l in links" :key="l.to" :to="l.to" class="nav-link" active-class="nav-active" exact-active-class="nav-active">
-            <Icon :name="l.icon" size="w-4 h-4" />{{ l.label }}
-          </router-link>
+<Icon :name="l.icon" size="w-4 h-4" />{{ l.label }}
+            <span v-if="l.badge" class="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-purple-600 text-white text-[11px] font-bold grid place-items-center">{{ l.badge }}</span>          </router-link>
         </nav>
 
         <div class="flex items-center gap-2 sm:gap-3">

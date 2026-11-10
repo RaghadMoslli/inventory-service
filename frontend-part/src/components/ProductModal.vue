@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import Icon from './Icon.vue'
 import { useProductStore } from '../stores/products'
 import { useOrderStore } from '../stores/orders'
+import { useCartStore } from '../stores/cart'
+import { useUiStore } from '../stores/ui'
 import { imageUrl, formatMoney } from '../utils/format'
 import { categoryLabel } from '../utils/constants'
 import { useAuthStore } from '../stores/auth'
@@ -14,7 +16,8 @@ const emit = defineEmits(['close', 'ordered'])
 const router = useRouter()
 const products = useProductStore()
 const orders = useOrderStore()
-
+const cart = useCartStore()
+const ui = useUiStore()
 const detail = ref(null)
 const loading = ref(false)
 const loadError = ref('')
@@ -29,7 +32,7 @@ const src = computed(() => imageUrl(shown.value?.image_path))
 const validQty = computed(() => Number.isInteger(qty.value) && qty.value >= 1 && qty.value <= available.value)
 const canOrder = computed(() => !created.value && available.value > 0 && validQty.value)
 const total = computed(() => Number(shown.value?.price ?? 0) * (validQty.value ? qty.value : 0))
-
+const inCart = computed(() => cart.quantityOf(shown.value?.id))
 let seq = 0
 async function loadDetail(silent = false) {
   const id = props.product?.id
@@ -74,6 +77,12 @@ onBeforeUnmount(() => {
 function step(delta) {
   const next = (Number(qty.value) || 1) + delta
   qty.value = Math.min(Math.max(next, 1), Math.max(available.value, 1))
+}
+function addToCart() {
+  if (!canOrder.value) return
+  cart.add(shown.value, qty.value)
+  ui.success(`أُضيف «${shown.value.name}» إلى السلة`)
+  emit('close')
 }
 
 async function submit() {
@@ -175,8 +184,8 @@ function goOrders() {
 
     <p v-if="orderError" class="p-3 rounded-xl bg-rose-950/30 border border-rose-800 text-rose-300 text-xs">{{ orderError }}</p>
 
-    <button class="btn btn-primary w-full py-3" :disabled="!canOrder || orders.creating" @click="submit">
-      {{ orders.creating ? 'جاري إنشاء الطلب...' : available < 1 ? 'المنتج غير متوفر حالياً' : 'تأكيد الطلب' }}
+    <button class="btn btn-primary w-full py-3" :disabled="!canOrder" @click="addToCart">
+      <Icon name="cart" size="w-4 h-4" />{{ available < 1 ? 'المنتج غير متوفر حالياً' : inCart ? `أضف إلى السلة (لديك ${inCart} فيها)` : 'أضف إلى السلة' }}
     </button>
   </div>
 </div>

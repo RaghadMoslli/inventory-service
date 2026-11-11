@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import api from '../api/axios'
 import { parseApiError } from '../utils/apiError'
+import { clearEtags } from '../utils/etagCache'
 
 export function validateProductPayload(p = {}) {
   const errors = {}
@@ -67,7 +68,14 @@ export const useProductStore = defineStore('products', {
 
       listRequest = (async () => {
         try {
-          const { data: body } = await api.get('/products', { params: clean(params) })
+          const response = await api.get('/products', { params: clean(params) })
+          // 304: content unchanged — keep current list, do not wipe state
+          if (response.status === 304) {
+            this.loaded = true
+            this.error = null
+            return true
+          }
+          const body = response.data
           const rows = Array.isArray(body) ? body : body.data ?? []
           this.products = rows
           rows.forEach((p) => { this.byId[p.id] = p })
@@ -96,8 +104,11 @@ export const useProductStore = defineStore('products', {
       if (!silent) this.detailLoading = true
       this.detailError = null
       try {
-        const { data } = await api.get(`/products/${id}`)
-        const product = data.data ?? data
+        const response = await api.get(`/products/${id}`)
+        if (response.status === 304) {
+          return this.byId[id] ?? this.currentProduct
+        }
+        const product = response.data.data ?? response.data
         this.byId[product.id] = product
         this.currentProduct = product
         return product
@@ -142,6 +153,7 @@ export const useProductStore = defineStore('products', {
         const { data } = await api.post('/products', toFormData(payload))
         const product = data.data ?? data
         this.byId[product.id] = product
+        clearEtags()
         return product
       } catch (error) {
         const parsed = parseApiError(error)
@@ -181,6 +193,8 @@ export const useProductStore = defineStore('products', {
         throw parseApiError(error)
       }
 
+      clearEtags()
+
       // رد الـ PATCH لا يحتوي الكمية، فنجلبها من الباك (يقرأها من Inventory Service)
       const fresh = await this.fetchProductDetails(id, { silent: true })
       const stockSynced = !fresh || Number(fresh.available_quantity) === fields.initial_stock
@@ -194,6 +208,7 @@ export const useProductStore = defineStore('products', {
         this.products = this.products.filter((p) => p.id !== id)
         delete this.byId[id]
         this.meta.total = Math.max(0, this.meta.total - 1)
+        clearEtags()
         return data?.message || 'تم حذف المنتج بنجاح'
       } catch (error) {
         throw parseApiError(error)

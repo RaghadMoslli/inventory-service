@@ -37,6 +37,7 @@ return [
         'orders_created_at_idx'           => ['orders', 'created_at'],
         'order_items_order_id_idx'        => ['order_items', 'order_id'],
         'order_items_product_id_idx'      => ['order_items', 'product_id'],
+        'notifications_user_id_idx'       => ['notifications', 'user_id'],
     ],
 
     // مدة صلاحية الكاش بالثواني (الإبطال الفوري يتم عند أي تعديل، والـ TTL شبكة أمان فقط)

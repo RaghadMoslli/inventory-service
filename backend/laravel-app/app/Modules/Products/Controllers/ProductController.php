@@ -10,7 +10,6 @@ use App\Modules\Products\Services\ProductCacheService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use OpenApi\Annotations as OA;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 class ProductController extends Controller
 {
@@ -290,8 +289,7 @@ class ProductController extends Controller
             Storage::disk('public')->delete($oldImage); // حذف الصورة القديمة
         }
 
-        // إبطال الكاش يتم تلقائيًا عبر Observer / ProductCacheService وأيضاً إبطال كاش هذا المنتج
-        Cache::forget('product_' . $id);
+        // إبطال الكاش يتم تلقائيًا عبر ProductObserver -> ProductCacheService::invalidate()
 
         // 3) نرجّع الكمية الحالية في الرد
         try {
@@ -334,8 +332,7 @@ public function destroy($id)
         
         $product->delete();
 
-        // إبطال الكاش فوراً عند الحذف
-        Cache::forget('product_' . $id);
+        // إبطال الكاش يتم تلقائيًا عبر ProductObserver -> ProductCacheService::invalidate()
 
         return response()->json([
             'message' => 'تم حذف المنتج بنجاح وإبطال الكاش'

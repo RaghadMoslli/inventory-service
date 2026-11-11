@@ -1,0 +1,30 @@
+$kind: http-request
+name: POST api/products
+url: "{{baseUrl}}/api/products"
+method: POST
+headers:
+  Content-Type: multipart/form-data
+  Accept: application/json
+body:
+  type: formdata
+  content:
+    - type: text
+      key: name
+      value: vmqeopfuudtdsufvyvddq
+      description: Must not be greater than 255 characters.
+    - type: text
+      key: description
+      value: Dolores dolorum amet iste laborum eius est dolor.
+    - type: text
+      key: price
+      value: "12"
+      description: Must be at least 0.
+    - type: text
+      key: category
+      value: consequatur
+    - type: file
+      key: image
+      src: []
+auth:
+  type: noauth
+order: 7000

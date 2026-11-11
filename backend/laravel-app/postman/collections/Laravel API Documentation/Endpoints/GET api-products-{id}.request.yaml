@@ -1,0 +1,15 @@
+$kind: http-request
+name: GET api/products/{id}
+url: "{{baseUrl}}/api/products/:id"
+method: GET
+headers:
+  Content-Type: application/json
+  Accept: application/json
+pathVariables:
+  - key: id
+    value: consequatur
+    description: The ID of the product.
+auth:
+  type: noauth
+examples: ./.resources/GET api-products-{id}.resources/examples
+order: 6000

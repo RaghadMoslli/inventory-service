@@ -1,7 +1,8 @@
+<script setup>
+import ToastHost from './components/ToastHost.vue'
+</script>
+
 <template>
   <router-view />
+  <ToastHost />
 </template>
-
-<script setup>
-// التطبيق سيعرض الصفحات ديناميكياً بناءً على الـ Router
-</script>

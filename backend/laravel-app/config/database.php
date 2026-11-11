@@ -88,6 +88,12 @@ return [
             'driver' => 'pgsql',
             'url' => env('DB_URL'),
             'host' => env('DB_HOST', '127.0.0.1'),
+            // فصل القراءة عن الكتابة (Read Replica): يُفعَّل فقط إذا عُرّف DB_READ_HOST
+            ...(env('DB_READ_HOST') ? [
+                'read' => array_filter(['host' => [env('DB_READ_HOST')], 'port' => env('DB_READ_PORT')]),
+                'write' => ['host' => [env('DB_WRITE_HOST', env('DB_HOST', '127.0.0.1'))]],
+                'sticky' => true,   // بعد كتابة داخل الطلب تُقرأ بقية استعلاماته من الـ Primary
+            ] : []),
             'port' => env('DB_PORT', '5432'),
             'database' => env('DB_DATABASE', 'laravel'),
             'username' => env('DB_USERNAME', 'root'),

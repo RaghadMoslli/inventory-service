@@ -16,8 +16,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // تسجيل الـ Middleware الخاص بالصلاحيات (Admin)
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckRole::class,
+            'etag' => \App\Http\Middleware\ETagMiddleware::class,
         ]);
         $middleware->append(SecurityHeadersMiddleware::class);
+        $middleware->append(\App\Http\Middleware\ReadYourWritesMiddleware::class); // قراءة من الـ Primary بعد الكتابة (Replica)
+        $middleware->append(\App\Http\Middleware\QueryCountMiddleware::class); // ترويسات X-Query-Count (عند PERF_DEBUG=true)
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // 1. معالجة خطأ عدم وجود المورد (404 Not Found) للـ API

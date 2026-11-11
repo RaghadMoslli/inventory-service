@@ -6,16 +6,21 @@ use App\Http\Controllers\Controller;
 use App\Modules\Products\Contracts\StockProvider;
 use App\Modules\Products\Models\Product;
 use Illuminate\Http\Request;
+use App\Modules\Products\Services\ProductCacheService;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use OpenApi\Annotations as OA;
-
+use Illuminate\Support\Facades\Storage;
 class ProductController extends Controller
 {
     protected StockProvider $stockProvider;
 
-    // حقن الـ StockProvider عبر الـ Constructor
-    public function __construct(StockProvider $stockProvider)
+    protected ProductCacheService $cache;
+
+    public function __construct(StockProvider $stockProvider, ProductCacheService $cache)
     {
         $this->stockProvider = $stockProvider;
+        $this->cache = $cache;
     }
 
     /**
@@ -41,18 +46,35 @@ class ProductController extends Controller
      *      @OA\Response(response=503, description="خدمة المخزون غير متاحة حالياً")
      * )
      */
-    // جلب قائمة المنتجات مع الكمية المتوفرة
     public function index(Request $request)
     {
-        $query = Product::query();
+        $perPage = max(1, (int) $request->get('per_page', 10));
+        $category = $request->has('category') ? (string) $request->category : null;
+        $page = max(1, (int) Paginator::resolveCurrentPage());
 
-        if ($request->has('category')) {
-            $query->where('category', $request->category);
-        }
+        // نخزّن صفوف المنتجات فقط (بدون الكمية المتوفرة): المفتاح يحمل رقم إصدار الكاش، فيبطل بتعديل أي منتج
+        $cached = $this->cache->remember(
+            $this->cache->listKey($category, $page, $perPage),
+            function () use ($category, $perPage, $page) {
+                $query = Product::query();
+                if ($category !== null) {
+                    $query->where('category', $category);
+                }
+                if ($this->cache->mustReadFromPrimary()) {
+                    $query->useWritePdo();   // الـ Replica قد تكون متأخرة: لا نخزّن منها بيانات قديمة
+                }
+                $p = $query->orderBy('id')->paginate($perPage, ['*'], 'page', $page);
 
-        $products = $query->paginate($request->get('per_page', 10));
+                return ['items' => $p->getCollection(), 'total' => $p->total()];
+            }
+        );
 
-        // جلب معرفات المنتجات الحالية
+        // نعيد بناء الـ paginator فيبقى شكل الرد (data, links, meta) مطابقًا تمامًا للأصل
+        $products = new LengthAwarePaginator($cached['items'], $cached['total'], $perPage, $page, [
+            'path' => Paginator::resolveCurrentPath(),
+            'pageName' => 'page',
+        ]);
+
         $productIds = $products->pluck('id')->toArray();
         
         try {
@@ -92,10 +114,17 @@ class ProductController extends Controller
      *      @OA\Response(response=503, description="خدمة المخزون غير متاحة حالياً")
      * )
      */
-    // عرض تفاصيل منتج واحد مع كميته المتوفرة
     public function show($id)
     {
-        $product = Product::findOrFail($id);
+        $product = $this->cache->remember($this->cache->itemKey((int) $id), function () use ($id) {
+            $query = Product::query();
+            if ($this->cache->mustReadFromPrimary()) {
+                $query->useWritePdo();
+            }
+
+            return $query->find($id);   // null لا يُخزَّن في الكاش
+        });
+        abort_if($product === null, 404);
 
         try {
             $stocks = $this->stockProvider->getStock([$product->id]);
@@ -142,7 +171,6 @@ class ProductController extends Controller
      *      @OA\Response(response=503, description="تم إلغاء إنشاء المنتج لأن خدمة المخزون غير متاحة")
      * )
      */
-    // إضافة منتج جديد (للأدمن)
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -151,12 +179,11 @@ class ProductController extends Controller
             'price' => 'required|numeric|min:0',
             'category' => 'required|string',
             'image' => 'nullable',
-            'initial_stock' => 'required|integer|min:0', // الكمية الأولية للمخزون
+            'initial_stock' => 'required|integer|min:0',
         ]);
 
         $imagePath = null;
         if ($request->hasFile('image')) {
-            // تخزين الصورة باسم عشوائي
             $imagePath = $request->file('image')->store('products', 'public');
         }
 
@@ -215,7 +242,7 @@ class ProductController extends Controller
      *      @OA\Response(response=422, description="خطأ في التحقق من صحة البيانات")
      * )
      */
-    public function update(Request $request, $id)
+  public function update(Request $request, $id)
     {
         $product = Product::findOrFail($id);
 
@@ -224,15 +251,53 @@ class ProductController extends Controller
             'description' => 'nullable|string',
             'price' => 'sometimes|numeric|min:0',
             'category' => 'sometimes|string',
-            'image' => 'nullable',
+            'image' => 'nullable|image|mimes:jpeg,png,webp|max:2048',
             'initial_stock' => 'sometimes|integer|min:0',
         ]);
 
+        // 1) الكمية أولاً: إذا فشلت خدمة المخزون نوقف التعديل كله فلا يبقى المنتج معدّلاً نصفياً
+        if (array_key_exists('initial_stock', $validated)) {
+            try {
+                $ok = $this->stockProvider->setStock($product->id, (int) $validated['initial_stock']);
+                if (! $ok) {
+                    throw new \RuntimeException('فشل تحديث الكمية في خدمة المخزون');
+                }
+            } catch (\RuntimeException $e) {
+                return response()->json([
+                    'error' => [
+                        'code' => 'INVENTORY_UNAVAILABLE',
+                        'message' => 'تم إلغاء التعديل لأن خدمة المخزون غير متاحة',
+                        'details' => $e->getMessage(),
+                    ],
+                ], 503);
+            }
+        }
+
+        // 2) الصورة الجديدة (إن وُجدت)
+        $oldImage = null;
+        if ($request->hasFile('image')) {
+            $oldImage = $product->image_path;
+            $validated['image_path'] = $request->file('image')->store('products', 'public');
+        }
+
+        // هذه ليست أعمدة في جدول المنتجات
+        unset($validated['image'], $validated['initial_stock']);
+
         $product->update($validated);
 
-        // إبطال الكاش فوراً عند التعديل
-        Cache::forget('product_' . $id);
-        Cache::flush();
+        if ($oldImage) {
+            Storage::disk('public')->delete($oldImage); // حذف الصورة القديمة
+        }
+
+        // إبطال الكاش يتم تلقائيًا عبر ProductObserver -> ProductCacheService::invalidate()
+
+        // 3) نرجّع الكمية الحالية في الرد
+        try {
+            $stocks = $this->stockProvider->getStock([$product->id]);
+            $product->available_quantity = $stocks[$product->id] ?? 0;
+        } catch (\RuntimeException $e) {
+            // التعديل نجح، فلا نفشله بسبب قراءة الكمية
+        }
 
         return response()->json([
             'message' => 'تم تحديث المنتج بنجاح وإبطال الكاش',
@@ -257,15 +322,17 @@ class ProductController extends Controller
      *      @OA\Response(response=404, description="المنتج غير موجود")
      * )
      */
-    public function destroy($id)
+public function destroy($id)
     {
         $product = Product::findOrFail($id);
         
+        if ($product->image_path) {
+            Storage::disk('public')->delete($product->image_path);
+        }
+        
         $product->delete();
 
-        // إبطال الكاش فوراً عند الحذف
-        Cache::forget('product_' . $id);
-        Cache::flush();
+        // إبطال الكاش يتم تلقائيًا عبر ProductObserver -> ProductCacheService::invalidate()
 
         return response()->json([
             'message' => 'تم حذف المنتج بنجاح وإبطال الكاش'

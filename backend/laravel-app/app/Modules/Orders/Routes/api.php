@@ -21,4 +21,6 @@ Route::middleware('auth:api')->group(function () {
     // تحديث حالة الطلب (مخصصة للـ Admin حصراً عبر وسيط الـ role)
     Route::patch('/orders/{order}/status', [OrderController::class, 'updateStatus'])
         ->middleware('role:admin');
+
+        
 });

@@ -9,12 +9,53 @@ services:
       POSTGRES_PASSWORD: secretpassword
     ports:
       - "5432:5432"
+    # --- Replication: الـ Primary يسمح للـ Replica بنسخ WAL (انظري docker/postgres/primary/pg_hba.conf) ---
+    command: ["postgres", "-c", "hba_file=/etc/postgresql/pg_hba.conf", "-c", "wal_level=replica", "-c", "max_wal_senders=10", "-c", "hot_standby=on"]
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/primary/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d ecommerce_platform"]
       interval: 5s
       timeout: 5s
+      retries: 10
+
+  # --- Read Replica حقيقي (Streaming Replication من db) ---
+  db-replica:
+    image: postgres:15-alpine
+    container_name: ecommerce_db_replica
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secretpassword
+      PRIMARY_HOST: db
+    entrypoint: ["/bin/sh", "/replica-entrypoint.sh"]
+    ports:
+      - "5434:5432" # منفذ خارجي مختلف حتى لا يتضارب مع 5432
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+      - ./docker/postgres/replica/entrypoint.sh:/replica-entrypoint.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ecommerce_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  # --- Redis للكاش ---
+  redis:
+    image: redis:7-alpine
+    container_name: ecommerce_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
       retries: 10
 
   inventory-db:
@@ -59,6 +100,7 @@ services:
       context: ./backend/laravel-app
       dockerfile: Dockerfile
     container_name: ecommerce_laravel
+    command: ["sh", "-c", "php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=8000 --no-reload"]
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -67,7 +109,9 @@ services:
       APP_DEBUG: "true"
       APP_KEY: base64:2fl+KtvkdphvQyE8mQqGqzqJb0n5nFqJkqYk3n7p0aE=
       DB_CONNECTION: pgsql
-      DB_HOST: db
+      DB_HOST: db                       # السيرفر الرئيسي افتراضياً
+      DB_WRITE_HOST: db                 # سيرفر الكتابة
+      DB_READ_HOST: db-replica          # سيرفر القراءة (الـ Replica)
       DB_PORT: 5432
       DB_DATABASE: ecommerce_platform
       DB_USERNAME: postgres
@@ -76,15 +120,54 @@ services:
       INVENTORY_GRPC_PORT: 9090
       INVENTORY_GRPC_TIMEOUT_MS: 3000
       INVENTORY_DRIVER: grpc
+      PERF_DEBUG: "true"
+      CACHE_STORE: redis                # الكاش في Redis بدل الـ database
+      REDIS_CLIENT: predis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     depends_on:
       db:
+        condition: service_healthy
+      db-replica:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       inventory:
         condition: service_started
     volumes:
       - ./backend/laravel-app:/var/www/html
+      - laravel_vendor:/var/www/html/vendor
       - ./inventory-service/proto:/proto:ro
+      - laravel_vendor:/var/www/html/vendor
+
+  frontend:
+    build:
+      context: ./frontend-part
+      dockerfile: Dockerfile
+    container_name: ecommerce_frontend
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    depends_on:
+      - laravel-app
+
+  frontend-dev:
+    image: node:22-alpine
+    container_name: ecommerce_frontend_dev
+    working_dir: /app
+    restart: unless-stopped
+    volumes:
+      - ./frontend-part:/app
+      - frontend_node_modules:/app/node_modules
+    command: sh -c "if [ ! -x node_modules/.bin/vite ]; then npm install; fi && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    depends_on:
+      - laravel-app
 
 volumes:
   postgres_data:
+  postgres_replica_data:   # --- [إضافة ذاكرة الحاوية الجديدة] ---
   inventory_postgres_data:
+  laravel_vendor:
+  frontend_node_modules:

@@ -3,9 +3,9 @@
 use Illuminate\Support\Facades\Route;
 use App\Modules\Products\Controllers\ProductController;
 
-// مسارات عامة للمنتجات
-Route::get('products', [ProductController::class, 'index']); // <-- أضفنا Route:: قبل الـ get
-Route::get('products/{id}', [ProductController::class, 'show']);
+// مسارات عامة للمنتجات (القراءة) — middleware 'etag' يضيف ETag ويرد 304 عند عدم التغيّر
+Route::get('products', [ProductController::class, 'index'])->middleware('etag');
+Route::get('products/{id}', [ProductController::class, 'show'])->middleware('etag');
 
 // مسارات محمية للـ Admin فقط
 Route::post('products', [ProductController::class, 'store'])->middleware(['auth:api', 'role:admin']);

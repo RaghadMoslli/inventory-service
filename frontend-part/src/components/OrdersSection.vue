@@ -1,368 +1,129 @@
+<script setup>
+import { ref, computed, reactive } from 'vue'
+import Icon from './Icon.vue'
+import OrderCard from './OrderCard.vue'
+import OrdersTable from './OrdersTable.vue'
+import EmptyState from './EmptyState.vue'
+import PaginationBar from './PaginationBar.vue'
+import ConfirmModal from './ConfirmModal.vue'
+import { useOrderStore } from '../stores/orders'
+import { useAuthStore } from '../stores/auth'
+import { useUiStore } from '../stores/ui'
+import { useAutoRefresh } from '../composables/useAutoRefresh'
+import { ORDER_STATUSES } from '../utils/constants'
+import { formatTime } from '../utils/format'
+
+const orders = useOrderStore()
+const auth = useAuthStore()
+const ui = useUiStore()
+
+const filter = ref('ALL')
+const busyId = ref(null)
+const lastUpdated = ref(null)
+const confirm = reactive({ open: false, order: null, status: null })
+
+const visible = computed(() => (filter.value === 'ALL' ? orders.orders : orders.orders.filter((o) => o.status === filter.value)))
+
+async function load(page = orders.pagination.current_page || 1, silent = true) {
+  const result = await orders.fetchOrders(page, { silent })
+  if (result) lastUpdated.value = new Date()
+}
+
+// تحميل فور فتح الصفحة، ثم تحديث كل 15 ثانية وعند العودة للتبويب
+useAutoRefresh(() => load(), 15000)
+
+function askCancel(order) {
+  confirm.order = order
+  confirm.status = 'CANCELLED'
+  confirm.open = true
+}
+function requestStatus(order, status) {
+  if (status === 'CANCELLED') askCancel(order)
+  else run(order, status)
+}
+
+async function run(order, status) {
+  busyId.value = order.id
+  const ok = status === 'CANCELLED' ? await orders.cancelOrder(order.id) : await orders.updateStatus(order.id, status)
+  busyId.value = null
+  if (ok) ui.success(status === 'CANCELLED' ? `تم إلغاء الطلب #${order.id} وإرجاع الكمية للمخزون` : `تم تحديث حالة الطلب #${order.id} إلى «${ORDER_STATUSES[status]}»`)
+  else ui.error(orders.error)
+}
+
+async function confirmRun() {
+  const { order, status } = confirm
+  confirm.open = false
+  await run(order, status)
+}
+</script>
+
 <template>
-  <section class="w-full space-y-6">
-
-    <!-- Header -->
-    <div class="flex flex-wrap justify-between items-center gap-4">
+  <section class="space-y-6">
+    <div class="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h2 class="text-2xl font-extrabold text-white">
-          إدارة الطلبات
-        </h2>
-
+        <h2 class="text-2xl sm:text-3xl font-extrabold text-white">{{ auth.isAdmin ? 'إدارة الطلبات' : 'طلباتي' }}</h2>
         <p class="text-sm text-slate-400 mt-1">
-          عرض جميع الطلبات وإدارة حالتها
+          {{ auth.isAdmin ? 'جميع طلبات العملاء وإدارة حالتها.' : 'تابع حالة طلباتك لحظة بلحظة.' }}
+          <span v-if="orders.pagination.total" class="text-slate-500">({{ orders.pagination.total }} طلب)</span>
         </p>
       </div>
-
-      <button
-        @click="loadOrders(pagination.current_page)"
-        :disabled="orderStore.loading"
-        class="px-4 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-xl text-sm font-bold transition-all"
-      >
-        {{ orderStore.loading ? 'جاري التحديث...' : 'تحديث الطلبات' }}
-      </button>
+      <div class="flex items-center gap-3">
+        <span v-if="lastUpdated" class="text-[11px] text-slate-500">آخر تحديث {{ formatTime(lastUpdated) }}</span>
+        <button class="btn btn-ghost" :disabled="orders.loading" @click="load(orders.pagination.current_page, false)">
+          <Icon name="refresh" size="w-4 h-4" :class="orders.loading ? 'animate-spin' : ''" />تحديث
+        </button>
+      </div>
     </div>
 
-    <!-- Admin protection in UI -->
-    <div
-      v-if="!authStore.isAdmin"
-      class="bg-rose-950/30 border border-rose-800 text-rose-300 rounded-xl p-4 text-sm"
-    >
-      ليس لديك صلاحية الوصول إلى إدارة الطلبات.
+    <div v-if="orders.orders.length" class="flex flex-wrap gap-2">
+      <button class="chip" :class="{ 'chip-active': filter === 'ALL' }" @click="filter = 'ALL'">الكل</button>
+      <button v-for="(label, key) in ORDER_STATUSES" :key="key" class="chip" :class="{ 'chip-active': filter === key }" @click="filter = key">{{ label }}</button>
     </div>
+
+    <!-- تحميل أولي -->
+    <div v-if="orders.loading && !orders.loaded" class="space-y-4">
+      <div v-for="n in 3" :key="n" class="skeleton h-56"></div>
+    </div>
+
+    <!-- خطأ بدون بيانات -->
+    <EmptyState v-else-if="orders.error && !orders.orders.length" icon="alert" title="تعذّر تحميل الطلبات" :text="orders.error">
+      <button class="btn btn-primary" @click="load(1, false)">إعادة المحاولة</button>
+    </EmptyState>
+
+    <EmptyState v-else-if="!orders.orders.length" icon="orders" :title="auth.isAdmin ? 'لا توجد طلبات بعد' : 'لم تقم بأي طلب بعد'" :text="auth.isAdmin ? 'ستظهر الطلبات الجديدة هنا تلقائياً.' : 'تصفح المنتجات واطلب ما يعجبك، وستجد طلباتك هنا.'">
+      <router-link v-if="!auth.isAdmin" to="/" class="btn btn-primary">تصفح المنتجات</router-link>
+    </EmptyState>
 
     <template v-else>
+      <p v-if="orders.error" class="rounded-xl bg-amber-950/30 border border-amber-800/60 text-amber-300 text-xs px-4 py-3">تعذّر تحديث القائمة، تُعرض آخر بيانات محمّلة. {{ orders.error }}</p>
 
-      <!-- Statistics -->
-      <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-
-        <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-          <p class="text-xs text-slate-400 mb-2">إجمالي الطلبات</p>
-          <p class="text-2xl font-extrabold text-white">
-            {{ pagination.total }}
-          </p>
+      <!-- الأدمن: جدول على الشاشات الكبيرة، وبطاقات على الجوال -->
+      <template v-if="auth.isAdmin">
+        <div class="hidden md:block">
+          <OrdersTable v-if="visible.length" :orders="visible" :busy-id="busyId" @save-status="requestStatus" />
         </div>
-
-        <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-          <p class="text-xs text-slate-400 mb-2">قيد الانتظار</p>
-          <p class="text-2xl font-extrabold text-amber-400">
-            {{ pendingCount }}
-          </p>
+        <div class="md:hidden space-y-4">
+          <OrderCard v-for="o in visible" :key="o.id" :order="o" is-admin :busy="busyId === o.id" @save-status="requestStatus" />
         </div>
+      </template>
 
-        <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4 col-span-2 md:col-span-1">
-          <p class="text-xs text-slate-400 mb-2">طلبات الصفحة الحالية</p>
-          <p class="text-2xl font-extrabold text-purple-400">
-            {{ orders.length }}
-          </p>
-        </div>
-
-      </div>
-
-      <!-- Error -->
-      <div
-        v-if="orderStore.error"
-        class="bg-rose-950/30 border border-rose-800 text-rose-300 rounded-xl p-4 text-sm"
-      >
-        {{ orderStore.error }}
-      </div>
-
-      <!-- Success -->
-      <div
-        v-if="feedback"
-        class="bg-emerald-950/30 border border-emerald-800 text-emerald-300 rounded-xl p-4 text-sm"
-      >
-        {{ feedback }}
-      </div>
-
-      <!-- Loading -->
-      <div
-        v-if="orderStore.loading && !orders.length"
-        class="text-center py-12 text-slate-400"
-      >
-        جاري تحميل الطلبات...
-      </div>
-
-      <!-- Empty -->
-      <div
-        v-else-if="!orders.length && !orderStore.loading"
-        class="text-center py-12 bg-slate-800/40 border border-slate-800 rounded-2xl"
-      >
-        <p class="text-slate-300 font-bold">
-          لا توجد طلبات حالياً
-        </p>
-
-        <p class="text-sm text-slate-500 mt-2">
-          ستظهر الطلبات الجديدة هنا تلقائياً بعد تحديث القائمة.
-        </p>
-      </div>
-
-      <!-- Orders List -->
+      <!-- العميل: بطاقات -->
       <div v-else class="space-y-4">
-
-        <article
-          v-for="order in orders"
-          :key="order.id"
-          class="bg-slate-800/50 border border-slate-700 rounded-2xl overflow-hidden"
-        >
-
-          <!-- Order Header -->
-          <div class="flex flex-wrap justify-between items-center gap-3 p-5 border-b border-slate-700">
-
-            <div>
-              <p class="text-white font-extrabold">
-                الطلب #{{ order.id }}
-              </p>
-
-              <p class="text-xs text-slate-400 mt-1">
-                العميل: {{ order.user?.name ?? order.user?.email ?? `#${order.user_id}` }}
-              </p>
-
-              <p
-                v-if="order.created_at"
-                class="text-xs text-slate-500 mt-1"
-              >
-                {{ formatDate(order.created_at) }}
-              </p>
-            </div>
-
-            <span
-              class="text-xs font-bold px-3 py-1.5 rounded-full border"
-              :class="statusClass(order.status)"
-            >
-              {{ ORDER_STATUSES[order.status] || order.status }}
-            </span>
-
-          </div>
-
-          <!-- Order Items -->
-          <div class="p-5 space-y-3">
-
-            <h3 class="text-xs font-bold text-slate-400">
-              المنتجات المطلوبة
-            </h3>
-
-            <div
-              v-if="order.items?.length"
-              class="space-y-2"
-            >
-              <div
-                v-for="(item, index) in order.items"
-                :key="item.id ?? index"
-                class="flex justify-between items-center gap-3 bg-slate-900/50 rounded-xl p-3"
-              >
-                <div>
-                  <p class="text-sm text-slate-200 font-semibold">
-                    {{ item.product?.name ?? item.name ?? `منتج #${item.product_id}` }}
-                  </p>
-
-                  <p class="text-xs text-slate-500 mt-1">
-                    الكمية: {{ item.quantity }}
-                  </p>
-                </div>
-
-                <p
-                  v-if="item.unit_price != null"
-                  class="text-sm text-slate-300 font-bold"
-                >
-                  {{ formatMoney(Number(item.unit_price) * Number(item.quantity)) }}
-                </p>
-              </div>
-            </div>
-
-            <p v-else class="text-sm text-slate-500">
-              لا توجد تفاصيل للمنتجات في استجابة الطلب.
-            </p>
-
-            <!-- Total -->
-            <div class="flex justify-between items-center pt-3 border-t border-slate-700">
-              <span class="text-sm text-slate-400">
-                إجمالي الطلب
-              </span>
-
-              <span class="text-lg font-extrabold text-white">
-                {{ formatMoney(order.total_amount) }}
-              </span>
-            </div>
-
-          </div>
-
-          <!-- Update Status -->
-          <div class="p-5 bg-slate-900/40 border-t border-slate-700">
-
-            <label class="block text-xs text-slate-400 font-bold mb-2">
-              تغيير حالة الطلب
-            </label>
-
-            <div class="flex flex-wrap gap-3">
-
-              <select
-                v-model="statusDrafts[order.id]"
-                class="flex-1 min-w-[160px] bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                <option
-                  v-for="(label, key) in ORDER_STATUSES"
-                  :key="key"
-                  :value="key"
-                >
-                  {{ label }}
-                </option>
-              </select>
-
-              <button
-                @click="saveStatus(order)"
-                :disabled="
-                  updatingOrderId === order.id ||
-                  statusDrafts[order.id] === order.status
-                "
-                class="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-all"
-              >
-                {{
-                  updatingOrderId === order.id
-                    ? 'جاري الحفظ...'
-                    : 'حفظ الحالة'
-                }}
-              </button>
-
-            </div>
-
-          </div>
-
-        </article>
-
+        <OrderCard v-for="o in visible" :key="o.id" :order="o" :busy="busyId === o.id" @cancel="askCancel" />
       </div>
+      <p v-if="!visible.length" class="text-center text-sm text-slate-500 py-10">لا توجد طلبات بهذه الحالة في هذه الصفحة.</p>
 
-      <!-- Pagination -->
-      <div
-        v-if="pagination.last_page > 1"
-        class="flex justify-between items-center gap-3 bg-slate-800/50 border border-slate-700 rounded-xl p-4"
-      >
-
-        <button
-          @click="loadOrders(pagination.current_page - 1)"
-          :disabled="pagination.current_page <= 1 || orderStore.loading"
-          class="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-white rounded-lg text-xs font-bold"
-        >
-          السابق
-        </button>
-
-        <span class="text-xs text-slate-400">
-          صفحة {{ pagination.current_page }} من {{ pagination.last_page }}
-        </span>
-
-        <button
-          @click="loadOrders(pagination.current_page + 1)"
-          :disabled="
-            pagination.current_page >= pagination.last_page ||
-            orderStore.loading
-          "
-          class="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-white rounded-lg text-xs font-bold"
-        >
-          التالي
-        </button>
-
-      </div>
-
+      <PaginationBar :current="orders.pagination.current_page" :last="orders.pagination.last_page" :disabled="orders.loading" @change="(p) => load(p, false)" />
     </template>
 
+    <ConfirmModal
+      :open="confirm.open"
+      title="إلغاء الطلب"
+      :message="`سيتم إلغاء الطلب #${confirm.order?.id ?? ''} وإرجاع الكمية المحجوزة إلى المخزون. لا يمكن التراجع عن هذه العملية.`"
+      confirm-text="نعم، إلغاء الطلب"
+      danger
+      @confirm="confirmRun"
+      @close="confirm.open = false"
+    />
   </section>
 </template>
-
-<script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
-
-import {
-  useOrderStore,
-  ORDER_STATUSES
-} from '../stores/orders'
-
-import { useAuthStore } from '../stores/auth'
-
-const orderStore = useOrderStore()
-const authStore = useAuthStore()
-
-const feedback = ref('')
-const updatingOrderId = ref(null)
-
-const statusDrafts = reactive({})
-
-const orders = computed(() => orderStore.orders)
-const pagination = computed(() => orderStore.pagination)
-
-const pendingCount = computed(() => {
-  return orders.value.filter(order => order.status === 'PENDING').length
-})
-
-// جلب الطلبات
-const loadOrders = async (page = 1) => {
-  feedback.value = ''
-
-  const result = await orderStore.fetchOrders(page)
-
-  if (result) {
-    result.forEach(order => {
-      statusDrafts[order.id] = order.status
-    })
-  }
-}
-
-// حفظ حالة الطلب
-const saveStatus = async (order) => {
-  const newStatus = statusDrafts[order.id]
-
-  if (!newStatus || newStatus === order.status) return
-
-  updatingOrderId.value = order.id
-  feedback.value = ''
-
-  const success = await orderStore.updateStatus(
-    order.id,
-    newStatus
-  )
-
-  if (success) {
-    feedback.value = `تم تحديث حالة الطلب #${order.id} بنجاح`
-  } else {
-    statusDrafts[order.id] = order.status
-  }
-
-  updatingOrderId.value = null
-}
-
-// تنسيق الحالة
-const statusClass = (status) => {
-  const classes = {
-    PENDING: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-    CONFIRMED: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-    SHIPPED: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-    DELIVERED: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    CANCELLED: 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-  }
-
-  return classes[status] || 'bg-slate-500/10 text-slate-400 border-slate-500/20'
-}
-
-// تنسيق التاريخ
-const formatDate = (date) => {
-  return new Date(date).toLocaleString('ar', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-// تنسيق المبلغ
-const formatMoney = (amount) => {
-  return Number(amount ?? 0).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })
-}
-
-onMounted(() => {
-  if (authStore.isAdmin) {
-    loadOrders()
-  }
-})
-</script>

@@ -184,10 +184,17 @@ class OrderController extends Controller
             ], 409);
         }
 
-        $reservationId = $reservation['reservation_id'];
-
+        $reservationId = $reservation['reservation_id'] ?? $reservation['reservationId'] ?? null;
+        if (! $reservationId) {
+            return response()->json([
+                'error' => [
+                    'code' => 'INVENTORY_UNAVAILABLE',
+                    'message' => 'تم الحجز لكن لم يُرجع رقم الحجز من خدمة المخزون',
+                ],
+            ], 503);
+        }
         try {
-            $order = DB::transaction(function () use ($request, $validated, $products, $total, $reservationId) {
+            $order = DB::transaction(function () use ($request, $validated, $products, $total, $reservationId, $productIds) {
                 $order = Order::create([
                     'user_id' => $request->user()->id,
                     'status' => 'PENDING',
@@ -203,6 +210,39 @@ class OrderController extends Controller
                         'quantity' => (int) $item['quantity'],
                         'unit_price' => $product->price,
                     ]);
+                }
+
+                // 🔔 إنشاء إشعار للمستخدم عند نجاح إنشاء الطلب
+                DB::table('notifications')->insert([
+                    'user_id' => $request->user()->id,
+                    'type' => 'OrderCreated',
+                    'message' => 'تم إنشاء طلبك رقم #' . $order->id . ' بنجاح وهو قيد المعالجة.',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                // 🔔 فحص المخزون المتبقي وإرسال إشعار للأدمن إذا نفد المنتج تماماً
+                try {
+                    $stocks = $this->inventoryGateway->getStock($productIds->toArray());
+                    foreach ($validated['items'] as $item) {
+                        $prodId = $item['product_id'];
+                        if (isset($stocks[$prodId]) && $stocks[$prodId] <= 0) {
+                            $productName = $products[$prodId]->name ?? "المنتج #{$prodId}";
+                            $admins = \App\Models\User::where('role', 'admin')->get();
+                            
+                            foreach ($admins as $admin) {
+                                DB::table('notifications')->insert([
+                                    'user_id' => $admin->id,
+                                    'type' => 'ProductOutOfStock',
+                                    'message' => "تنبيه هام: نفدت كمية المنتج \"{$productName}\" تماماً من المخزون وأصبحت صفراً!",
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ]);
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // تجاهل خطأ فحص المخزون الثانوي لئلا يعطل العملية الأساسية
                 }
 
                 return $order->load('items');
@@ -257,12 +297,33 @@ class OrderController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($order) {
-            if ($order->reservation_id) {
-                $this->inventoryGateway->release($order->reservation_id);
-            }
-            $order->update(['status' => 'CANCELLED']);
-        });
+        try {
+            DB::transaction(function () use ($order) {
+                if ($order->reservation_id) {
+                    $released = $this->inventoryGateway->release($order->reservation_id);
+                    if (! $released) {
+                        throw new RuntimeException('Inventory release returned false for reservation '.$order->reservation_id);
+                    }
+                }
+                $order->update(['status' => 'CANCELLED']);
+
+                DB::table('notifications')->insert([
+                    'user_id' => $order->user_id,
+                    'type' => 'OrderCancelled',
+                    'message' => 'تم إلغاء الطلب رقم #'.$order->id.' بنجاح وإرجاع المخزون.',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            });
+        } catch (RuntimeException $e) {
+            return response()->json([
+                'error' => [
+                    'code' => 'INVENTORY_UNAVAILABLE',
+                    'message' => 'تعذر إرجاع المخزون، لم يتم إلغاء الطلب',
+                    'details' => $e->getMessage(),
+                ],
+            ], 503);
+        }
 
         return response()->json([
             'message' => 'تم إلغاء الطلب وإرجاع المخزون',
@@ -305,17 +366,38 @@ class OrderController extends Controller
 
         $newStatus = $request->status;
 
-        DB::transaction(function () use ($order, $newStatus) {
-            if ($newStatus === 'CANCELLED' && $order->status !== 'CANCELLED') {
-                if ($order->reservation_id) {
-                    $this->inventoryGateway->release($order->reservation_id);
+        try {
+            DB::transaction(function () use ($order, $newStatus) {
+                if ($newStatus === 'CANCELLED' && $order->status !== 'CANCELLED') {
+                    if ($order->reservation_id) {
+                        $released = $this->inventoryGateway->release($order->reservation_id);
+                        if (! $released) {
+                            throw new RuntimeException('Inventory release returned false for reservation '.$order->reservation_id);
+                        }
+                    }
                 }
-            }
 
-            $order->update([
-                'status' => $newStatus,
-            ]);
-        });
+                $order->update([
+                    'status' => $newStatus,
+                ]);
+
+                DB::table('notifications')->insert([
+                    'user_id' => $order->user_id,
+                    'type' => 'OrderStatusUpdated',
+                    'message' => 'تم تغيير حالة طلبك رقم #'.$order->id.' إلى: '.$newStatus,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            });
+        } catch (RuntimeException $e) {
+            return response()->json([
+                'error' => [
+                    'code' => 'INVENTORY_UNAVAILABLE',
+                    'message' => 'تعذر إرجاع المخزون، لم يتم تحديث حالة الطلب',
+                    'details' => $e->getMessage(),
+                ],
+            ], 503);
+        }
 
         return response()->json([
             'message' => 'تم تحديث حالة الطلب بنجاح',

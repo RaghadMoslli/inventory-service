@@ -79,10 +79,20 @@ class GrpcStockProvider implements StockProvider
             'items' => $payloadItems,
         ]);
 
+        $shortages = [];
+        foreach ($response['shortages'] ?? [] as $shortage) {
+            $shortages[] = [
+                'product_id' => (int) ($shortage['product_id'] ?? $shortage['productId'] ?? 0),
+                'requested' => (int) ($shortage['requested'] ?? 0),
+                'available' => (int) ($shortage['available'] ?? 0),
+            ];
+        }
+
         return [
             'success' => (bool) ($response['success'] ?? false),
-            'reservation_id' => $response['reservation_id'] ?? null,
-            'shortages' => $response['shortages'] ?? [],
+            // grpcurl JSON often returns camelCase (reservationId)
+            'reservation_id' => $response['reservation_id'] ?? $response['reservationId'] ?? null,
+            'shortages' => $shortages,
         ];
     }
 

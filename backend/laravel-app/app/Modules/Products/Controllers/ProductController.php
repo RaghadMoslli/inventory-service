@@ -10,7 +10,8 @@ use App\Modules\Products\Services\ProductCacheService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use OpenApi\Annotations as OA;
-
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 class ProductController extends Controller
 {
     protected StockProvider $stockProvider;
@@ -242,7 +243,7 @@ class ProductController extends Controller
      *      @OA\Response(response=422, description="خطأ في التحقق من صحة البيانات")
      * )
      */
-    public function update(Request $request, $id)
+  public function update(Request $request, $id)
     {
         $product = Product::findOrFail($id);
 
@@ -251,13 +252,55 @@ class ProductController extends Controller
             'description' => 'nullable|string',
             'price' => 'sometimes|numeric|min:0',
             'category' => 'sometimes|string',
-            'image' => 'nullable',
+            'image' => 'nullable|image|mimes:jpeg,png,webp|max:2048',
             'initial_stock' => 'sometimes|integer|min:0',
         ]);
 
+        // 1) الكمية أولاً: إذا فشلت خدمة المخزون نوقف التعديل كله فلا يبقى المنتج معدّلاً نصفياً
+        if (array_key_exists('initial_stock', $validated)) {
+            try {
+                $ok = $this->stockProvider->setStock($product->id, (int) $validated['initial_stock']);
+                if (! $ok) {
+                    throw new \RuntimeException('فشل تحديث الكمية في خدمة المخزون');
+                }
+            } catch (\RuntimeException $e) {
+                return response()->json([
+                    'error' => [
+                        'code' => 'INVENTORY_UNAVAILABLE',
+                        'message' => 'تم إلغاء التعديل لأن خدمة المخزون غير متاحة',
+                        'details' => $e->getMessage(),
+                    ],
+                ], 503);
+            }
+        }
+
+        // 2) الصورة الجديدة (إن وُجدت)
+        $oldImage = null;
+        if ($request->hasFile('image')) {
+            $oldImage = $product->image_path;
+            $validated['image_path'] = $request->file('image')->store('products', 'public');
+        }
+
+        // هذه ليست أعمدة في جدول المنتجات
+        unset($validated['image'], $validated['initial_stock']);
+
         $product->update($validated);
 
-        // إبطال الكاش يتم تلقائيًا عبر Observer / ProductCacheService بدون Cache::flush() الشامل
+        if ($oldImage) {
+            Storage::disk('public')->delete($oldImage); // حذف الصورة القديمة
+        }
+
+        // إبطال الكاش يتم تلقائيًا عبر Observer / ProductCacheService وأيضاً إبطال كاش هذا المنتج
+        Cache::forget('product_' . $id);
+
+        // 3) نرجّع الكمية الحالية في الرد
+        try {
+            $stocks = $this->stockProvider->getStock([$product->id]);
+            $product->available_quantity = $stocks[$product->id] ?? 0;
+        } catch (\RuntimeException $e) {
+            // التعديل نجح، فلا نفشله بسبب قراءة الكمية
+        }
+
         return response()->json([
             'message' => 'تم تحديث المنتج بنجاح وإبطال الكاش',
             'data' => $product
@@ -281,13 +324,19 @@ class ProductController extends Controller
      *      @OA\Response(response=404, description="المنتج غير موجود")
      * )
      */
-    public function destroy($id)
+public function destroy($id)
     {
         $product = Product::findOrFail($id);
         
+        if ($product->image_path) {
+            Storage::disk('public')->delete($product->image_path);
+        }
+        
         $product->delete();
 
-        // إبطال الكاش يتم تلقائيًا عبر Observer / ProductCacheService بدون Cache::flush() الشامل
+        // إبطال الكاش فوراً عند الحذف
+        Cache::forget('product_' . $id);
+
         return response()->json([
             'message' => 'تم حذف المنتج بنجاح وإبطال الكاش'
         ]);

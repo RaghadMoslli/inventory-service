@@ -218,13 +218,6 @@ class ProductController extends Controller
     /**
      * @OA\Patch(
      *      path="/api/v1/products/{id}",
-<<<<<<< HEAD
-     *      summary="تعديل منتج (للأدمن)",
-     *      tags={"Products"},
-     *      security={{"bearerAuth":{}}},
-     *      @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
-     *      @OA\Response(response=200, description="تم التعديل بنجاح")
-=======
      *      summary="تحديث بيانات منتج (للمشرفين)",
      *      tags={"Products"},
      *      security={{"bearerAuth":{}}},
@@ -247,7 +240,6 @@ class ProductController extends Controller
      *      @OA\Response(response=200, description="تم تحديث المنتج بنجاح وإبطال الكاش"),
      *      @OA\Response(response=404, description="المنتج غير موجود"),
      *      @OA\Response(response=422, description="خطأ في التحقق من صحة البيانات")
->>>>>>> origin/merge_backend_frontend
      * )
      */
     public function update(Request $request, $id)
@@ -263,19 +255,9 @@ class ProductController extends Controller
 
         $product->update($validated);
 
-<<<<<<< HEAD
-        // إبطال الكاش يتم تلقائيًا في ProductObserver (saved)
-
-        return response()->json([
-            'message' => 'تم تحديث المنتج بنجاح',
-=======
-        // إبطال الكاش فوراً عند التعديل
-        Cache::forget('product_' . $id);
-        Cache::flush();
-
+        // إبطال الكاش يتم تلقائيًا عبر Observer / ProductCacheService بدون Cache::flush() الشامل
         return response()->json([
             'message' => 'تم تحديث المنتج بنجاح وإبطال الكاش',
->>>>>>> origin/merge_backend_frontend
             'data' => $product
         ]);
     }
@@ -286,10 +268,6 @@ class ProductController extends Controller
      *      summary="حذف منتج (للأدمن)",
      *      tags={"Products"},
      *      security={{"bearerAuth":{}}},
-<<<<<<< HEAD
-     *      @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
-     *      @OA\Response(response=200, description="تم الحذف بنجاح")
-=======
      *      @OA\Parameter(
      *          name="id",
      *          in="path",
@@ -299,7 +277,6 @@ class ProductController extends Controller
      *      ),
      *      @OA\Response(response=200, description="تم حذف المنتج بنجاح وإبطال الكاش"),
      *      @OA\Response(response=404, description="المنتج غير موجود")
->>>>>>> origin/merge_backend_frontend
      * )
      */
     public function destroy($id)
@@ -308,19 +285,9 @@ class ProductController extends Controller
         
         $product->delete();
 
-<<<<<<< HEAD
-        // إبطال الكاش يتم تلقائيًا في ProductObserver (deleted)
-
-        return response()->json([
-            'message' => 'تم حذف المنتج بنجاح'
-=======
-        // إبطال الكاش فوراً عند الحذف
-        Cache::forget('product_' . $id);
-        Cache::flush();
-
+        // إبطال الكاش يتم تلقائيًا عبر Observer / ProductCacheService بدون Cache::flush() الشامل
         return response()->json([
             'message' => 'تم حذف المنتج بنجاح وإبطال الكاش'
->>>>>>> origin/merge_backend_frontend
         ]);
     }
 }

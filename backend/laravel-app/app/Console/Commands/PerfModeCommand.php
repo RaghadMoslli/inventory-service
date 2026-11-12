@@ -6,14 +6,7 @@ use App\Support\PerfMode;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
-/**
- * تبديل النظام بين وضع baseline (بدون تحسينات) ووضع optimized (كل التحسينات).
- *
- *   php artisan perf:mode status
- *   php artisan perf:mode baseline
- *   php artisan perf:mode optimized
- *   php artisan perf:mode baseline --enable=indexes     (baseline + تفعيل الفهارس فقط)
- */
+
 class PerfModeCommand extends Command
 {
     protected $signature = 'perf:mode
@@ -69,7 +62,6 @@ class PerfModeCommand extends Command
         return self::SUCCESS;
     }
 
-    /** ينشئ الفهارس أو يحذفها حسب العلم indexes */
     private function syncIndexes(bool $enabled): void
     {
         foreach (config('perf.indexes', []) as $name => [$table, $columns]) {
@@ -80,7 +72,6 @@ class PerfModeCommand extends Command
             }
         }
 
-        // تحديث إحصائيات المخطِّط حتى يختار الخطة الصحيحة بعد التغيير
         DB::statement('ANALYZE products');
         DB::statement('ANALYZE orders');
         DB::statement('ANALYZE order_items');

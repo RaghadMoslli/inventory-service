@@ -6,20 +6,7 @@ use App\Support\PerfMode;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
-/**
- * كاش المنتجات (Redis) — سياسة الكاش كاملة في هذا الملف.
- *
- * ماذا نخزّن؟  صفوف المنتجات من قاعدة البيانات فقط (قوائم + منتج مفرد).
- * ماذا لا نخزّن؟ الكمية المتوفرة: تأتي من خدمة Spring في كل طلب لأنها تتغير مع كل طلب شراء.
- *
- * الإبطال: "رقم إصدار" (version token). كل مفتاح يحمل الإصدار الحالي في اسمه:
- *     products:v{N}:list:...   و   products:v{N}:item:{id}
- * عند أي إضافة/تعديل/حذف نزيد N بمقدار 1 (عملية واحدة O(1)) فتصبح كل المفاتيح القديمة غير قابلة للوصول
- * وتنتهي وحدها بالـ TTL. أفضل من Cache::flush() لأنه لا يمسح بقية بيانات التطبيق، ولا يتطلب البحث عن مفاتيح.
- *
- * الأعلام: إذا كان flag "cache" مطفأ (baseline) نتجاوز الكاش كليًا.
- * أعطال Redis: أي استثناء من Redis يُسجَّل ثم نقرأ من قاعدة البيانات (الموقع لا يقع بسبب الكاش).
- */
+
 class ProductCacheService
 {
     private const VERSION_KEY = 'products:version';
@@ -56,7 +43,7 @@ class ProductCacheService
             return $loader();
         }
 
-        $ran = false;   // هل نُفّذ $loader؟ إن فشل هو نفسه (مثلًا قاعدة البيانات) لا نكرره، بل نمرّر الخطأ
+        $ran = false;   
         $load = function () use ($loader, &$ran) {
             $ran = true;
 
@@ -73,13 +60,13 @@ class ProductCacheService
 
             $lock = Cache::lock($key.':lock', 10);
             try {
-                $lock->block(3);   // ننتظر حتى 3 ثوانٍ إن كان طلب آخر يحسب القيمة
+                $lock->block(3);  
             } catch (\Throwable) {
-                // انتهت مهلة القفل: نكمل ونحسب بأنفسنا
+          
             }
 
             try {
-                $cached = Cache::get($key);    // ربما ملأه الطلب الذي انتظرناه
+                $cached = Cache::get($key);   
                 if ($cached !== null) {
                     $this->count(self::HITS);
 
@@ -106,7 +93,7 @@ class ProductCacheService
         }
     }
 
-    /** يُستدعى بعد أي تعديل على المنتجات (من ProductObserver) */
+   
     public function invalidate(): void
     {
         try {
@@ -114,17 +101,14 @@ class ProductCacheService
                 Cache::forever(self::VERSION_KEY, 1);
             }
             Cache::increment(self::VERSION_KEY);
-            // علامة "كتابة حديثة": خلال ثوانٍ قليلة نملأ الكاش من الـ Primary لأن الـ Replica قد تكون متأخرة
+         
             Cache::put(self::RECENT_WRITE_KEY, 1, config('perf.ryw_ttl', 5));
         } catch (\Throwable $e) {
             Log::warning('Product cache invalidation failed: '.$e->getMessage());
         }
     }
 
-    /**
-     * true خلال ثوانٍ بعد كتابة: أي تعبئة للكاش يجب أن تقرأ من الـ Primary،
-     * وإلا قد نخزّن بيانات قديمة من Replica متأخرة تحت الإصدار الجديد.
-     */
+   
     public function mustReadFromPrimary(): bool
     {
         try {

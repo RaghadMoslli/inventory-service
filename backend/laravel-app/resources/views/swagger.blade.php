@@ -107,10 +107,12 @@
                                 "summary": "جلب قائمة المنتجات مع الكمية المتوفرة",
                                 "parameters": [
                                     {"name": "category", "in": "query", "required": false, "schema": {"type": "string"}},
-                                    {"name": "per_page", "in": "query", "required": false, "schema": {"type": "integer", "default": 10}}
+                                    {"name": "per_page", "in": "query", "required": false, "schema": {"type": "integer", "default": 10}},
+                                    {"name": "If-None-Match", "in": "header", "required": false, "schema": {"type": "string"}, "description": "ضع قيمة ETag من الرد السابق لاختبار 304"}
                                 ],
                                 "responses": {
                                     "200": {"description": "تم جلب قائمة المنتجات بنجاح"},
+                                    "304": {"description": "المحتوى لم يتغير (ETag مطابق)"},
                                     "503": {"description": "خدمة المخزون غير متاحة حالياً"}
                                 }
                             },
@@ -149,10 +151,12 @@
                                 "tags": ["Products"],
                                 "summary": "عرض تفاصيل منتج واحد",
                                 "parameters": [
-                                    {"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}
+                                    {"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}},
+                                    {"name": "If-None-Match", "in": "header", "required": false, "schema": {"type": "string"}, "description": "ضع قيمة ETag من الرد السابق لاختبار 304"}
                                 ],
                                 "responses": {
                                     "200": {"description": "تم جلب تفاصيل المنتج بنجاح"},
+                                    "304": {"description": "المحتوى لم يتغير (ETag مطابق)"},
                                     "404": {"description": "المنتج غير موجود"}
                                 }
                             },

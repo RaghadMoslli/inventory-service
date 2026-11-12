@@ -31,10 +31,44 @@ class ETagMiddleware
             return $response;
         }
 
-        $response->setEtag(md5($response->getContent()), true);   // weak ETag: W/"..."
+        $hash = md5($response->getContent());
+        // strong ETag: "hash" — أسهل للمطابقة من Postman/Swagger
+        $etag = '"'.$hash.'"';
+        $response->headers->set('ETag', $etag);
         $response->headers->set('Cache-Control', 'no-cache, private');
-        $response->isNotModified($request);                       // يحوّله إلى 304 إذا طابقت البصمة
+
+        if ($this->matchesIfNoneMatch($request, $hash)) {
+            $response->setNotModified();
+        }
 
         return $response;
+    }
+
+    /**
+     * يقبل If-None-Match بعدة أشكال شائعة من العملاء:
+     * "hash" | W/"hash" | hash | قائمة مفصولة بفواصل
+     */
+    private function matchesIfNoneMatch(Request $request, string $hash): bool
+    {
+        $header = $request->headers->get('If-None-Match');
+        if ($header === null || trim($header) === '') {
+            return false;
+        }
+
+        if (trim($header) === '*') {
+            return true;
+        }
+
+        foreach (preg_split('/\s*,\s*/', $header) ?: [] as $candidate) {
+            $normalized = strtolower(trim($candidate));
+            $normalized = preg_replace('/^w\//', '', $normalized) ?? $normalized;
+            $normalized = trim($normalized, "\"'");
+
+            if ($normalized === strtolower($hash)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

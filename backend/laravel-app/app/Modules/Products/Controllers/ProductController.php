@@ -11,6 +11,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use OpenApi\Annotations as OA;
 use Illuminate\Support\Facades\Storage;
+
 class ProductController extends Controller
 {
     protected StockProvider $stockProvider;
@@ -52,7 +53,6 @@ class ProductController extends Controller
         $category = $request->has('category') ? (string) $request->category : null;
         $page = max(1, (int) Paginator::resolveCurrentPage());
 
-        // نخزّن صفوف المنتجات فقط (بدون الكمية المتوفرة): المفتاح يحمل رقم إصدار الكاش، فيبطل بتعديل أي منتج
         $cached = $this->cache->remember(
             $this->cache->listKey($category, $page, $perPage),
             function () use ($category, $perPage, $page) {
@@ -61,7 +61,7 @@ class ProductController extends Controller
                     $query->where('category', $category);
                 }
                 if ($this->cache->mustReadFromPrimary()) {
-                    $query->useWritePdo();   // الـ Replica قد تكون متأخرة: لا نخزّن منها بيانات قديمة
+                    $query->useWritePdo();
                 }
                 $p = $query->orderBy('id')->paginate($perPage, ['*'], 'page', $page);
 
@@ -69,14 +69,13 @@ class ProductController extends Controller
             }
         );
 
-        // نعيد بناء الـ paginator فيبقى شكل الرد (data, links, meta) مطابقًا تمامًا للأصل
         $products = new LengthAwarePaginator($cached['items'], $cached['total'], $perPage, $page, [
             'path' => Paginator::resolveCurrentPath(),
             'pageName' => 'page',
         ]);
 
         $productIds = $products->pluck('id')->toArray();
-        
+
         try {
             $stocks = $this->stockProvider->getStock($productIds);
         } catch (\RuntimeException $e) {
@@ -122,7 +121,7 @@ class ProductController extends Controller
                 $query->useWritePdo();
             }
 
-            return $query->find($id);   // null لا يُخزَّن في الكاش
+            return $query->find($id);
         });
         abort_if($product === null, 404);
 
@@ -255,7 +254,6 @@ class ProductController extends Controller
             'initial_stock' => 'sometimes|integer|min:0',
         ]);
 
-        // 1) الكمية أولاً: إذا فشلت خدمة المخزون نوقف التعديل كله فلا يبقى المنتج معدّلاً نصفياً
         if (array_key_exists('initial_stock', $validated)) {
             try {
                 $ok = $this->stockProvider->setStock($product->id, (int) $validated['initial_stock']);
@@ -273,30 +271,25 @@ class ProductController extends Controller
             }
         }
 
-        // 2) الصورة الجديدة (إن وُجدت)
         $oldImage = null;
         if ($request->hasFile('image')) {
             $oldImage = $product->image_path;
             $validated['image_path'] = $request->file('image')->store('products', 'public');
         }
 
-        // هذه ليست أعمدة في جدول المنتجات
         unset($validated['image'], $validated['initial_stock']);
 
         $product->update($validated);
 
         if ($oldImage) {
-            Storage::disk('public')->delete($oldImage); // حذف الصورة القديمة
+            Storage::disk('public')->delete($oldImage);
         }
 
-        // إبطال الكاش يتم تلقائيًا عبر ProductObserver -> ProductCacheService::invalidate()
-
-        // 3) نرجّع الكمية الحالية في الرد
         try {
             $stocks = $this->stockProvider->getStock([$product->id]);
             $product->available_quantity = $stocks[$product->id] ?? 0;
         } catch (\RuntimeException $e) {
-            // التعديل نجح، فلا نفشله بسبب قراءة الكمية
+
         }
 
         return response()->json([
@@ -325,14 +318,12 @@ class ProductController extends Controller
 public function destroy($id)
     {
         $product = Product::findOrFail($id);
-        
+
         if ($product->image_path) {
             Storage::disk('public')->delete($product->image_path);
         }
-        
-        $product->delete();
 
-        // إبطال الكاش يتم تلقائيًا عبر ProductObserver -> ProductCacheService::invalidate()
+        $product->delete();
 
         return response()->json([
             'message' => 'تم حذف المنتج بنجاح وإبطال الكاش'

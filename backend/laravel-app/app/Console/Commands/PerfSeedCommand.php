@@ -7,16 +7,6 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
-/**
- * يملأ قاعدة البيانات ببيانات ضخمة واقعية لقياس الأداء.
- *
- *   php artisan perf:seed --fresh --force
- *   php artisan perf:seed --products=20000 --orders=100000 --seed=7
- *
- * الإدخال جماعي بـ INSERT ... SELECT ... generate_series داخل Postgres نفسه،
- * فيدخل عشرات الآلاف من الصفوف بثوانٍ بدل إدخالها سطرًا سطرًا من PHP.
- * رقم --seed ثابت، فيولّد كل عضو في الفريق بيانات متطابقة تمامًا.
- */
 class PerfSeedCommand extends Command
 {
     protected $signature = 'perf:seed
@@ -52,7 +42,6 @@ class PerfSeedCommand extends Command
             $this->components->info('تم تفريغ المنتجات والطلبات.');
         }
 
-        // نفس الاتصال يُستعمل بكل الأوامر التالية، فيصبح random() قابلًا للتكرار
         DB::unprepared('SELECT setseed('.number_format(($seed % 1000) / 1000, 3, '.', '').')');
 
         $this->step('حسابات ثابتة (admin و customer)', function () {
@@ -64,7 +53,7 @@ class PerfSeedCommand extends Command
             ]);
         });
 
-        $hash = Hash::make('password123'); // مرة واحدة فقط، لأن bcrypt بطيء عمدًا
+        $hash = Hash::make('password123');
 
         $this->step("المستخدمون ({$users})", function () use ($users, $hash) {
             DB::statement(
@@ -79,10 +68,9 @@ class PerfSeedCommand extends Command
         $firstProductId = $this->maxId('products') + 1;
         $this->step("المنتجات ({$products})", function () use ($products) {
             $categories = config('perf.categories');
-            $arr = "(ARRAY['".implode("','", $categories)."'])"; // الأقواس ضرورية لفهرسة المصفوفة
+            $arr = "(ARRAY['".implode("','", $categories)."'])";
             $n = count($categories);
 
-            // power(random(), 1.5): التصنيفات الأولى أكثر شيوعًا (توزيع غير منتظم كالواقع)
             DB::statement(
                 "INSERT INTO products (name, description, price, category, image_path, created_at, updated_at)
                  SELECT 'Product ' || g,
@@ -100,7 +88,7 @@ class PerfSeedCommand extends Command
         $firstOrderId = $this->maxId('orders') + 1;
         if ($orders > 0) {
             $this->step("الطلبات ({$orders})", function () use ($orders) {
-                // نحسب r و ts في استعلام فرعي حتى تُقيَّم random() لكل صف على حدة
+
                 DB::statement(
                     "WITH u AS (SELECT array_agg(id ORDER BY id) AS a FROM users WHERE email LIKE 'perfuser%@example.test')
                      INSERT INTO orders (user_id, status, reservation_id, total_amount, created_at, updated_at)
@@ -119,7 +107,7 @@ class PerfSeedCommand extends Command
             });
 
             $this->step('عناصر الطلبات', function () use ($firstOrderId, $maxItems) {
-                // عدد العناصر لكل طلب مشتق من رقم الطلب (حتمي)، والمنتج يُختار بميل نحو الأكثر شعبية
+
                 DB::statement(
                     "WITH p AS (SELECT array_agg(id ORDER BY id) AS a FROM products)
                      INSERT INTO order_items (order_id, product_id, quantity, unit_price, created_at, updated_at)
@@ -156,7 +144,6 @@ class PerfSeedCommand extends Command
             }
         });
 
-        // الإدخال الجماعي يتجاوز Eloquent (فلا يعمل Observer) فنبطل كاش المنتجات يدويًا
         app(\App\Modules\Products\Services\ProductCacheService::class)->invalidate();
 
         $this->summary();

@@ -8,14 +8,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
-/**
- * Read-Your-Writes عبر الطلبات المتتالية.
- *
- * المشكلة: الـ Replica قد تتأخر ثوانيَ عن الـ Primary. إن عدّل المستخدم منتجًا ثم أعاد تحميل القائمة
- * فقد تأتيه البيانات القديمة من الـ Replica.
- * الحل: بعد أي كتابة ناجحة نضع علامة في Redis (مفتاحها من بصمة التوكن، بدون استعلام DB) لمدة ryw_ttl ثانية،
- * وكل طلب من نفس المستخدم خلال هذه المدة يقرأ من الـ Primary. (داخل الطلب الواحد يتكفل بذلك sticky=true).
- */
 class ReadYourWritesMiddleware
 {
     public function handle(Request $request, Closure $next): Response
@@ -27,7 +19,7 @@ class ReadYourWritesMiddleware
                 DB::connection()->useWriteConnectionWhenReading();
             }
         } catch (\Throwable) {
-            // Redis غير متاح: نكمل بدون الميزة
+
         }
 
         $response = $next($request);

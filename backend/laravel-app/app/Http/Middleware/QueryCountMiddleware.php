@@ -8,14 +8,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
-/**
- * يضيف للرد ترويسات تساعد على إثبات التحسين أمام المعيدة:
- *   X-Query-Count    عدد استعلامات قاعدة البيانات في هذا الطلب (يشمل استعلام المصادقة)
- *   X-Query-Time-Ms  مجموع زمن الاستعلامات
- *   X-Perf-Mode      baseline | optimized | custom
- *
- * لا يعمل إلا إذا PERF_DEBUG=true في بيئة التطبيق.
- */
 class QueryCountMiddleware
 {
     public function handle(Request $request, Closure $next): Response

@@ -5,10 +5,6 @@ namespace App\Console\Commands;
 use App\Modules\Products\Services\ProductCacheService;
 use Illuminate\Console\Command;
 
-/**
- *   php artisan perf:cache-stats           عرض عدّاد الإصابات/الإخفاقات
- *   php artisan perf:cache-stats --reset   تصفير العدّادات قبل تجربة جديدة
- */
 class PerfCacheStatsCommand extends Command
 {
     protected $signature = 'perf:cache-stats {--reset : تصفير العدّادات}';

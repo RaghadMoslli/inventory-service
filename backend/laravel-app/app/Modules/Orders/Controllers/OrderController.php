@@ -18,12 +18,11 @@ use RuntimeException;
 class OrderController extends Controller
 {
     use AuthorizesRequests;
-    
+
     public function __construct(protected StockProvider $inventoryGateway)
     {
     }
 
-   
     public function index(Request $request)
     {
         $user = $request->user();
@@ -41,7 +40,6 @@ class OrderController extends Controller
         ]);
     }
 
-   
     public function show($id)
     {
         $order = $this->withItems(Order::query())->findOrFail($id);
@@ -53,12 +51,13 @@ class OrderController extends Controller
         ]);
     }
 
-   
     private function withItems($query)
     {
-        return PerfMode::on('eager_loading')
-            ? $query->with('items.product:id,name')
-            : $query->with('items');
+        if (PerfMode::on('eager_loading')) {
+            return $query->with('items.product:id,name');
+        }
+
+        return $query;
     }
 
     private function addProductNames($orders): void
@@ -71,7 +70,6 @@ class OrderController extends Controller
         }
     }
 
-   
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -147,7 +145,6 @@ class OrderController extends Controller
                     ]);
                 }
 
-                // 🔔 إنشاء إشعار للمستخدم عند نجاح إنشاء الطلب
                 DB::table('notifications')->insert([
                     'user_id' => $request->user()->id,
                     'type' => 'OrderCreated',
@@ -163,7 +160,7 @@ class OrderController extends Controller
                         if (isset($stocks[$prodId]) && $stocks[$prodId] <= 0) {
                             $productName = $products[$prodId]->name ?? "المنتج #{$prodId}";
                             $admins = \App\Models\User::where('role', 'admin')->get();
-                            
+
                             foreach ($admins as $admin) {
                                 DB::table('notifications')->insert([
                                     'user_id' => $admin->id,
@@ -201,7 +198,6 @@ class OrderController extends Controller
         ], 201);
     }
 
- 
     public function cancel(Request $request, $id)
     {
         $order = Order::findOrFail($id);
@@ -248,7 +244,6 @@ class OrderController extends Controller
         ]);
     }
 
-   
     public function updateStatus(Request $request, $id)
     {
         $order = Order::findOrFail($id);

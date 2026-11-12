@@ -6,10 +6,6 @@ use App\Modules\Products\Contracts\StockProvider;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
-/**
- * Real gRPC client for inventory.v1.InventoryService via grpcurl.
- * Speaks the same proto contract as the Spring inventory service.
- */
 class GrpcStockProvider implements StockProvider
 {
     private string $target;
@@ -36,12 +32,12 @@ class GrpcStockProvider implements StockProvider
 
         $response = $this->call('GetStock', $payload);
         $result = [];
-        
+
         foreach ($response['items'] ?? [] as $item) {
-            // دعم كلا الاحتمالات لتسمية المفاتيح منعاً لأي خطأ
+
             $id = $item['product_id'] ?? $item['productId'] ?? 0;
             $available = $item['available'] ?? $item['availableQuantity'] ?? 0;
-            
+
             if ($id > 0) {
                 $result[(int) $id] = (int) $available;
             }
@@ -90,7 +86,7 @@ class GrpcStockProvider implements StockProvider
 
         return [
             'success' => (bool) ($response['success'] ?? false),
-            // grpcurl JSON often returns camelCase (reservationId)
+
             'reservation_id' => $response['reservation_id'] ?? $response['reservationId'] ?? null,
             'shortages' => $shortages,
         ];
@@ -105,10 +101,6 @@ class GrpcStockProvider implements StockProvider
         return (bool) ($response['released'] ?? false);
     }
 
-    /**
-     * @param  array<string, mixed>  $payload
-     * @return array<string, mixed>
-     */
     private function call(string $method, array $payload): array
     {
         $candidates = [
@@ -159,7 +151,6 @@ class GrpcStockProvider implements StockProvider
             return [];
         }
 
-        /** @var array<string, mixed> $decoded */
         $decoded = json_decode($output, true, 512, JSON_THROW_ON_ERROR);
 
         return $decoded;

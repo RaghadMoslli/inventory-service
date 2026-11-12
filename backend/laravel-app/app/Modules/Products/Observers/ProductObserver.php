@@ -5,7 +5,6 @@ namespace App\Modules\Products\Observers;
 use App\Modules\Products\Models\Product;
 use App\Modules\Products\Services\ProductCacheService;
 
-
 class ProductObserver
 {
     public function __construct(private ProductCacheService $cache)

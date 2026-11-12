@@ -6,7 +6,6 @@ use App\Support\PerfMode;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
-
 class ProductCacheService
 {
     private const VERSION_KEY = 'products:version';
@@ -29,21 +28,13 @@ class ProductCacheService
         return sprintf('products:v%d:item:%d', $this->version(), $id);
     }
 
-    /**
-     * يعيد القيمة من الكاش، أو ينفّذ $loader ويخزّن النتيجة.
-     * القفل يمنع "cache stampede": عند الفشل المتزامن يحسب طلب واحد فقط والبقية تنتظره.
-     *
-     * @template T
-     * @param  callable():T  $loader
-     * @return T
-     */
     public function remember(string $key, callable $loader)
     {
         if (! $this->enabled()) {
             return $loader();
         }
 
-        $ran = false;   
+        $ran = false;
         $load = function () use ($loader, &$ran) {
             $ran = true;
 
@@ -60,13 +51,13 @@ class ProductCacheService
 
             $lock = Cache::lock($key.':lock', 10);
             try {
-                $lock->block(3);  
+                $lock->block(3);
             } catch (\Throwable) {
-          
+
             }
 
             try {
-                $cached = Cache::get($key);   
+                $cached = Cache::get($key);
                 if ($cached !== null) {
                     $this->count(self::HITS);
 
@@ -93,7 +84,6 @@ class ProductCacheService
         }
     }
 
-   
     public function invalidate(): void
     {
         try {
@@ -101,14 +91,13 @@ class ProductCacheService
                 Cache::forever(self::VERSION_KEY, 1);
             }
             Cache::increment(self::VERSION_KEY);
-         
+
             Cache::put(self::RECENT_WRITE_KEY, 1, config('perf.ryw_ttl', 5));
         } catch (\Throwable $e) {
             Log::warning('Product cache invalidation failed: '.$e->getMessage());
         }
     }
 
-   
     public function mustReadFromPrimary(): bool
     {
         try {
@@ -118,7 +107,6 @@ class ProductCacheService
         }
     }
 
-    /** @return array{hits:int,misses:int,version:int,hit_ratio:float} */
     public function stats(): array
     {
         $hits = (int) Cache::get(self::HITS, 0);

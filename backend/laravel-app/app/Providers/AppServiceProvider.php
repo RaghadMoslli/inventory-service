@@ -32,10 +32,8 @@ class AppServiceProvider extends ServiceProvider
     {
         Gate::policy(Order::class, OrderPolicy::class);
 
-        // إبطال كاش المنتجات تلقائيًا عند أي تعديل
         Product::observe(ProductObserver::class);
 
-        // flag "replica": عند الإطفاء (baseline) كل القراءات تذهب للـ Primary
         if (config('database.connections.pgsql.read') && ! PerfMode::on('replica')) {
             config(['database.connections.pgsql.read' => ['host' => [config('database.connections.pgsql.write.host.0')]]]);
         }

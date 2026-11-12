@@ -2,22 +2,11 @@
 
 namespace App\Support;
 
-/**
- * قراءة وكتابة أعلام قياس الأداء.
- *
- * الاستعمال داخل الكود:
- *     if (PerfMode::on('eager_loading')) { ... الطريقة المحسّنة ... } else { ... الطريقة الأصلية ... }
- *
- * الحالة محفوظة في ملف JSON (config('perf.state_file')).
- * إذا لم يوجد الملف: كل الأعلام مفعّلة (optimized).
- * في بيئة production تُتجاهل الأعلام دائمًا ويُعتبر كل شيء مفعّلًا.
- */
 class PerfMode
 {
-    /** @var array<string,bool>|null */
+
     private static ?array $cache = null;
 
-    /** @return array<string,bool> */
     public static function flags(): array
     {
         if (self::$cache !== null) {
@@ -48,7 +37,6 @@ class PerfMode
         return self::flags()[$flag] ?? true;
     }
 
-    /** @param array<string,bool> $flags */
     public static function save(array $flags): void
     {
         $file = config('perf.state_file');
@@ -61,7 +49,6 @@ class PerfMode
         self::forget();
     }
 
-    /** baseline | optimized | custom */
     public static function label(): string
     {
         $flags = self::flags();

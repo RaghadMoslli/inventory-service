@@ -2,7 +2,6 @@ import http from 'k6/http';
 import { check } from 'k6';
 import { API, authHeaders, login, requireEnv } from './common.js';
 
-// Functional test: uses a dedicated product ID and restores its original name.
 export const options = {
   vus: 1,
   iterations: 1,

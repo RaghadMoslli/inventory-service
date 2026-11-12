@@ -6,7 +6,6 @@ use App\Support\PerfMode;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
-
 class PerfModeCommand extends Command
 {
     protected $signature = 'perf:mode

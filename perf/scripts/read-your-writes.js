@@ -2,7 +2,6 @@ import http from 'k6/http';
 import { check } from 'k6';
 import { API, authHeaders, login, requireEnv } from './common.js';
 
-// Functional test for read-your-writes. Run with optimized mode and an admin account.
 export const options = {
   vus: 1,
   iterations: 1,

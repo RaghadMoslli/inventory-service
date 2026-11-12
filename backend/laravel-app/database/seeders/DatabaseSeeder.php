@@ -11,7 +11,6 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. إنشاء حساب Admin افتراضي
         User::firstOrCreate(
             ['email' => 'admin@test.com'],
             [
@@ -21,7 +20,6 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // 2. إنشاء حساب Customer افتراضي
         User::firstOrCreate(
             ['email' => 'customer@test.com'],
             [
@@ -31,7 +29,6 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // 3. إنشاء 15 منتجاً تجريبياً بتصنيفات مختلفة
         $categories = ['Electronics', 'Clothing', 'Books', 'Home'];
 
         for ($i = 1; $i <= 15; $i++) {

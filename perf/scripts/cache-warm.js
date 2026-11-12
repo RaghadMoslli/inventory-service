@@ -2,8 +2,6 @@ import http from 'k6/http';
 import { check } from 'k6';
 import { API, DEFAULT_HEADERS, recordAppHeaders } from './common.js';
 
-// Run after enabling cache. Each iteration sends the same URL twice:
-// request 1 can be a MISS if the cache key is cold; request 2 should be a HIT.
 export const options = {
   vus: Number(__ENV.CACHE_VUS || 1),
   iterations: Number(__ENV.CACHE_ITERATIONS || 10),

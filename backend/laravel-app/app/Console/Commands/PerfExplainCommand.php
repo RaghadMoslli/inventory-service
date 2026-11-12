@@ -6,15 +6,6 @@ use App\Support\PerfMode;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
-/**
- * يشغّل EXPLAIN (ANALYZE) على أبطأ الاستعلامات ويطبع جدولًا مختصرًا:
- * نوع المسح (Seq Scan أو Index Scan) وزمن التنفيذ الفعلي.
- *
- *   php artisan perf:explain
- *   php artisan perf:explain --save      (يحفظ الخطط الكاملة في storage/app/perf/)
- *
- * شغّليه مرة بوضع baseline ومرة بوضع optimized، وقارني.
- */
 class PerfExplainCommand extends Command
 {
     protected $signature = 'perf:explain
@@ -79,7 +70,6 @@ class PerfExplainCommand extends Command
         return self::SUCCESS;
     }
 
-    /** @return array<string,string>|null */
     private function queries(): ?array
     {
         $topUser = DB::selectFromWriteConnection(
@@ -105,7 +95,6 @@ class PerfExplainCommand extends Command
         ];
     }
 
-    /** @return array<string,mixed> */
     private function explainJson(string $sql): array
     {
         $row = DB::selectFromWriteConnection("EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) {$sql}")[0];
@@ -121,7 +110,6 @@ class PerfExplainCommand extends Command
         return implode("\n", array_map(fn ($r) => ((array) $r)['QUERY PLAN'], $rows));
     }
 
-    /** @return list<string> */
     private function scanNodes(array $node): array
     {
         $found = [];

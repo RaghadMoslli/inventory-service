@@ -1,25 +1,16 @@
 ﻿# ============================================================
-# perf-menu.ps1 - Before/After k6 runner (Baseline vs Optimized)
-# Pick a feature -> pick ONE test of that feature -> the script runs
-# k6 in Baseline mode, then in Optimized mode, then prints a comparison.
-# Run from the project root: .\perf-menu.ps1
-# This script does NOT seed, delete, or reset database records.
-# ============================================================
 
 $ErrorActionPreference = "Continue"
 
-# Refresh PATH so a newly installed k6 is visible in this same terminal.
 $env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' +
             [System.Environment]::GetEnvironmentVariable('Path','User')
 
-# Use UTF-8 in this PowerShell session.
 try {
     [Console]::InputEncoding  = [System.Text.UTF8Encoding]::new($false)
     [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
     $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 } catch { }
 
-# Resolve k6.exe (winget installs to "C:\Program Files\k6\k6.exe")
 $K6 = $null
 foreach ($candidate in @(
     (Get-Command k6 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source),
@@ -37,10 +28,6 @@ Write-Host "Using k6: $K6" -ForegroundColor DarkGray
 
 $App = "docker compose exec laravel-app php artisan"
 
-# Modes:
-#   Baseline  = everything OFF.
-#   Optimized = only the chosen feature ON (others stay OFF),
-#               or ALL features ON when the "all features" option is chosen.
 $BaselineMode  = { param($f) "$App perf:mode baseline" }
 $OptimizedMode = {
     param($f)
@@ -48,13 +35,11 @@ $OptimizedMode = {
     else              { "$App perf:mode baseline --enable=$f" }
 }
 
-# ---------- Test accounts (seed defaults; terminal env vars still override if set) ----------
 $Defaults = [ordered]@{
     "USER_EMAIL"          = "customer@test.com"
     "USER_PASSWORD"       = "password123"
     "ADMIN_EMAIL"         = "admin@test.com"
     "ADMIN_PASSWORD"      = "password123"
-    # Use a real product id that exists in your DB (change if needed)
     "MUTATION_PRODUCT_ID" = "1"
 }
 foreach ($k in $Defaults.Keys) {
@@ -63,42 +48,38 @@ foreach ($k in $Defaults.Keys) {
     }
 }
 
-# ---------- k6 scripts ----------
 $Scripts = [ordered]@{
     "products-list"       = "perf/scripts/products-list.js"
     "products-filter"     = "perf/scripts/products-filter.js"
     "product-details"     = "perf/scripts/product-details.js"
     "orders-list"         = "perf/scripts/orders-list.js"
+    "orders-eager"        = "perf/scripts/orders-eager.js"
     "cache-warm"          = "perf/scripts/cache-warm.js"
     "cache-invalidation"  = "perf/scripts/cache-invalidation.js"
     "etag-304"            = "perf/scripts/etag-304.js"
     "read-your-writes"    = "perf/scripts/read-your-writes.js"
 }
 
-# Environment variables required by particular scripts.
 $ScriptRequirements = @{
     "orders-list"        = @("USER_EMAIL", "USER_PASSWORD")
+    "orders-eager"       = @("ADMIN_EMAIL", "ADMIN_PASSWORD")
     "cache-invalidation" = @("ADMIN_EMAIL", "ADMIN_PASSWORD", "MUTATION_PRODUCT_ID")
     "read-your-writes"   = @("ADMIN_EMAIL", "ADMIN_PASSWORD", "MUTATION_PRODUCT_ID")
 }
 
-# Only scripts that match where each Laravel feature is actually implemented.
 $FeatureK6 = [ordered]@{
     "indexes"       = @("products-filter", "orders-list")      # category index + orders user/created_at
-    "eager_loading" = @("orders-list")                         # OrderController::withItems only
+    "eager_loading" = @("orders-eager")                        # N+1 vs with(items.product) on GET /orders
     "cache"         = @("cache-warm", "cache-invalidation")    # ProductCacheService
     "etag"          = @("etag-304")                            # ETagMiddleware on products GET
     "replica"       = @("read-your-writes")                    # ReadYourWritesMiddleware
 }
 
-# Safe load for a laptop demo. 1000 VUs can freeze the machine; 70 shows clear pressure.
 $MaxVus = 70
 $env:MAX_VUS = "$MaxVus"
 Write-Host "MAX_VUS fixed at $MaxVus (edit `$MaxVus in this file to change)." -ForegroundColor DarkGray
 
 New-Item -ItemType Directory -Force -Path "perf/results" | Out-Null
-
-# ---------------- Helpers ----------------
 
 function Say($msg, $color = "Cyan") { Write-Host "`n>>> $msg" -ForegroundColor $color }
 
@@ -148,7 +129,6 @@ function Show-Comparison($baseFile, $optFile) {
     $b = Get-Content $baseFile -Raw | ConvertFrom-Json
     $o = Get-Content $optFile  -Raw | ConvertFrom-Json
 
-    # label, metric, stat, higherIsBetter, unit
     $rows = @(
         @("Response time avg",   "http_req_duration", "avg",    $false, "ms"),
         @("Response time med",   "http_req_duration", "med",    $false, "ms"),
@@ -204,14 +184,13 @@ function Run-BeforeAfter($feature, $test) {
     if ($test -eq "etag-304") {
         Write-Host "    Success means second request returns 304 (not a big p95 drop)." -ForegroundColor Yellow
     }
-    if ($test -eq "orders-list" -and $feature -eq "eager_loading") {
-        Write-Host "    Focus on DB queries / req (app_query_count), not only HTTP p95." -ForegroundColor Yellow
+    if ($test -eq "orders-eager" -and $feature -eq "eager_loading") {
+        Write-Host "    Success = app_query_count drops a lot (N+1 -> few queries). Ignore HTTP if close." -ForegroundColor Yellow
     }
 
     $baseFile = "perf/results/$feature-baseline-$test.json"
     $optFile  = "perf/results/$feature-optimized-$test.json"
 
-    # ---- 1) BASELINE ----
     Say "[1/2] BASELINE - $feature / $test (MAX_VUS=$env:MAX_VUS)" "Green"
     Run (& $BaselineMode $feature)
     if ($script:LastRunExitCode -ne 0) { return }
@@ -220,7 +199,6 @@ function Run-BeforeAfter($feature, $test) {
     }
     Run "& `"$K6`" run --summary-export `"$baseFile`" `"$scriptPath`""
 
-    # ---- 2) OPTIMIZED (feature alone ON, or all ON) ----
     if ($feature -eq "all") {
         Say "[2/2] OPTIMIZED - ALL flags ON / $test (MAX_VUS=$env:MAX_VUS)" "Green"
     } else {
@@ -233,7 +211,6 @@ function Run-BeforeAfter($feature, $test) {
     }
     Run "& `"$K6`" run --summary-export `"$optFile`" `"$scriptPath`""
 
-    # ---- Comparison ----
     Say "RESULT: $feature / $test (Baseline vs Optimized)" "Green"
     Show-Comparison $baseFile $optFile
 
@@ -246,7 +223,6 @@ function Run-BeforeAfter($feature, $test) {
         Run "$App perf:cache-stats"
     }
 
-    # Leave the app in a clean Baseline state.
     Run "$App perf:mode baseline"
 }
 
@@ -258,8 +234,6 @@ function Read-Choice($prompt, $max) {
         Write-Host "Invalid choice." -ForegroundColor Yellow
     }
 }
-
-# ---------------- Main loop ----------------
 
 while ($true) {
     $flags = @($FeatureK6.Keys)
@@ -280,7 +254,6 @@ while ($true) {
 
     if ($fi -eq $allOption) {
         $feature = "all"
-        # Non-mutating load scripts only (safer for interview demo)
         $tests = @("products-filter", "orders-list", "product-details", "cache-warm", "etag-304")
         Write-Host "    NOTE: ALL mode turns EVERY flag ON in the second run." -ForegroundColor Yellow
     } else {

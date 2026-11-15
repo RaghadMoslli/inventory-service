@@ -14,7 +14,10 @@ RUN npm install
 # نسخ باقي كود المشروع
 COPY . .
 
-# بناء التطبيق للإنتاج (ينتج مجلد dist)
+# Laravel routes are under /api/v1 — bake this into the Vite build
+ARG VITE_API_URL=http://localhost:8000/api/v1
+ENV VITE_API_URL=$VITE_API_URL
+
 RUN npm run build
 
 # ==========================================

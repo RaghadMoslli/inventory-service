@@ -2,6 +2,7 @@
 
 namespace App\Modules\Orders\Controllers;
 
+use App\Events\OrderCreated;
 use App\Http\Controllers\Controller;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
@@ -191,6 +192,8 @@ class OrderController extends Controller
                 ],
             ], 500);
         }
+
+        event(new OrderCreated($order));
 
         return response()->json([
             'message' => 'تم إنشاء الطلب بنجاح',

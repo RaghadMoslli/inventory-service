@@ -6,7 +6,7 @@
         "version": "1.0.0"
     },
     "paths": {
-        "/api": {}
+        "/api/v1": {}
     },
     "components": {
         "securitySchemes": {

@@ -19,6 +19,7 @@ const routes = [
         component: () => import('../views/AdminAddProduct.vue'),
         meta: { requiresAdmin: true, title: 'إضافة منتج' },
       },
+      { path: 'admin/orders-live', redirect: '/orders' },
       {
         path: 'admin/email-monitor',
         name: 'AdminEmailMonitor',

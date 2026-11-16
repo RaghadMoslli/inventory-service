@@ -7,7 +7,7 @@ import { ORDER_STATUSES, STATUS_FLOW, CANCELLABLE_STATUSES } from '../utils/cons
 import { formatMoney, formatDateTime, imageUrl } from '../utils/format'
 
 const props = defineProps({ order: { type: Object, required: true }, isAdmin: Boolean, busy: Boolean })
-const emit = defineEmits(['cancel', 'save-status'])
+const emit = defineEmits(['cancel', 'save-status', 'decide'])
 
 const products = useProductStore()
 const draft = ref(props.order.status)
@@ -79,6 +79,15 @@ const itemsCount = computed(() => (props.order.items || []).reduce((sum, i) => s
       <button class="btn btn-primary" :disabled="busy || draft === order.status" @click="emit('save-status', order, draft)">
         {{ busy ? 'جاري الحفظ...' : 'حفظ الحالة' }}
       </button>
+      <!-- قرار سريع للطلبات التي بانتظار المسؤول: مرة واحدة فقط -->
+      <div v-if="order.status === 'PENDING'" class="basis-full flex gap-3">
+        <button class="btn btn-primary flex-1" :disabled="busy" @click="emit('decide', order, 'approved')">
+          <Icon name="check" size="w-4 h-4" />موافقة
+        </button>
+        <button class="btn btn-danger-soft flex-1" :disabled="busy" @click="emit('decide', order, 'rejected')">
+          <Icon name="x" size="w-4 h-4" />رفض
+        </button>
+      </div>
     </footer>
 
     <!-- إجراءات العميل -->

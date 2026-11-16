@@ -3,9 +3,12 @@
 namespace App\Modules\Orders\Controllers;
 
 use App\Events\OrderCreated;
+use App\Exceptions\InvalidOrderTransitionException;
 use App\Http\Controllers\Controller;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
+use App\Modules\Orders\Services\OrderDecisionService;
+use App\Modules\Orders\Support\OrderFeedPayload;
 use App\Modules\Products\Contracts\StockProvider;
 use App\Modules\Products\Models\Product;
 use App\Support\PerfMode;
@@ -20,8 +23,10 @@ class OrderController extends Controller
 {
     use AuthorizesRequests;
 
-    public function __construct(protected StockProvider $inventoryGateway)
-    {
+    public function __construct(
+        protected StockProvider $inventoryGateway,
+        protected OrderDecisionService $orderDecisions
+    ) {
     }
 
     public function index(Request $request)
@@ -201,6 +206,20 @@ class OrderController extends Controller
         ], 201);
     }
 
+    /**
+     * @OA\Patch(
+     *      path="/api/v1/orders/{id}/cancel",
+     *      summary="إلغاء الطلب (من PENDING أو CONFIRMED فقط) وإرجاع المخزون",
+     *      tags={"Orders"},
+     *      security={{"bearerAuth":{}}},
+     *      @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *      @OA\Response(response=200, description="تم الإلغاء أو الطلب ملغي مسبقاً"),
+     *      @OA\Response(response=403, description="ليس طلبك"),
+     *      @OA\Response(response=404, description="الطلب غير موجود"),
+     *      @OA\Response(response=422, description="لا يمكن الإلغاء بعد الشحن أو التسليم"),
+     *      @OA\Response(response=503, description="تعذّر إرجاع المخزون")
+     * )
+     */
     public function cancel(Request $request, $id)
     {
         $order = Order::findOrFail($id);
@@ -214,23 +233,22 @@ class OrderController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($order) {
-                if ($order->reservation_id) {
-                    $released = $this->inventoryGateway->release($order->reservation_id);
-                    if (! $released) {
-                        throw new RuntimeException('Inventory release returned false for reservation '.$order->reservation_id);
-                    }
-                }
-                $order->update(['status' => 'CANCELLED']);
-
-                DB::table('notifications')->insert([
-                    'user_id' => $order->user_id,
-                    'type' => 'OrderCancelled',
-                    'message' => 'تم إلغاء الطلب رقم #'.$order->id.' بنجاح وإرجاع المخزون.',
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            });
+            $order = $this->orderDecisions->changeStatus(
+                (int) $id,
+                'CANCELLED',
+                $request->user(),
+                null,
+                'OrderCancelled',
+                'تم إلغاء الطلب رقم #'.$id.' بنجاح وإرجاع المخزون.'
+            );
+        } catch (InvalidOrderTransitionException $e) {
+            return response()->json([
+                'error' => [
+                    'code' => 'INVALID_TRANSITION',
+                    'message' => 'لا يمكن إلغاء الطلب بعد شحنه أو تسليمه',
+                    'current_status' => $e->from,
+                ],
+            ], 422);
         } catch (RuntimeException $e) {
             return response()->json([
                 'error' => [
@@ -247,40 +265,50 @@ class OrderController extends Controller
         ]);
     }
 
+       /**
+     * @OA\Patch(
+     *      path="/api/v1/orders/{id}/status",
+     *      summary="تغيير حالة الطلب (أدمن فقط، للأمام بدون قفز)",
+     *      tags={"Orders"},
+     *      security={{"bearerAuth":{}}},
+     *      @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *      @OA\RequestBody(required=true, @OA\JsonContent(
+     *          required={"status"},
+     *          @OA\Property(property="status", type="string", enum={"CONFIRMED","SHIPPED","DELIVERED","CANCELLED"}),
+     *          @OA\Property(property="note", type="string", nullable=true)
+     *      )),
+     *      @OA\Response(response=200, description="تم التحديث"),
+     *      @OA\Response(response=403, description="ليس أدمن"),
+     *      @OA\Response(response=404, description="الطلب غير موجود"),
+     *      @OA\Response(response=422, description="انتقال غير مسموح"),
+     *      @OA\Response(response=503, description="تعذّر إرجاع المخزون")
+     * )
+     */
     public function updateStatus(Request $request, $id)
     {
         $order = Order::findOrFail($id);
         $this->authorize('updateStatus', $order);
 
-        $request->validate([
+        $validated = $request->validate([
             'status' => 'required|in:PENDING,CONFIRMED,SHIPPED,DELIVERED,CANCELLED',
+            'note' => 'nullable|string|max:500',
         ]);
 
-        $newStatus = $request->status;
-
         try {
-            DB::transaction(function () use ($order, $newStatus) {
-                if ($newStatus === 'CANCELLED' && $order->status !== 'CANCELLED') {
-                    if ($order->reservation_id) {
-                        $released = $this->inventoryGateway->release($order->reservation_id);
-                        if (! $released) {
-                            throw new RuntimeException('Inventory release returned false for reservation '.$order->reservation_id);
-                        }
-                    }
-                }
-
-                $order->update([
-                    'status' => $newStatus,
-                ]);
-
-                DB::table('notifications')->insert([
-                    'user_id' => $order->user_id,
-                    'type' => 'OrderStatusUpdated',
-                    'message' => 'تم تغيير حالة طلبك رقم #'.$order->id.' إلى: '.$newStatus,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            });
+            $order = $this->orderDecisions->changeStatus(
+                (int) $id,
+                $validated['status'],
+                $request->user(),
+                $validated['note'] ?? null
+            );
+        } catch (InvalidOrderTransitionException $e) {
+            return response()->json([
+                'error' => [
+                    'code' => 'INVALID_TRANSITION',
+                    'message' => 'انتقال حالة الطلب غير مسموح',
+                    'current_status' => $e->from,
+                ],
+            ], 422);
         } catch (RuntimeException $e) {
             return response()->json([
                 'error' => [
@@ -291,9 +319,10 @@ class OrderController extends Controller
             ], 503);
         }
 
+        // يحتوي على حقول الطلب العادية (id) وحقول الصفحة اللحظية (order_id) معاً
         return response()->json([
             'message' => 'تم تحديث حالة الطلب بنجاح',
-            'data' => $order->fresh('items'),
+            'data' => array_merge($order->fresh('items')->toArray(), OrderFeedPayload::from($order)),
         ]);
     }
 }

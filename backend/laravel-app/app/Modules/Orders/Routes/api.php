@@ -14,8 +14,10 @@ Route::middleware('auth:api')->group(function () {
 
     Route::get('/orders/{id}/email-status', [EmailLogController::class, 'orderStatus']);
 
+    // العميل: إلغاء من PENDING أو CONFIRMED فقط
     Route::patch('/orders/{order}/cancel', [OrderController::class, 'cancel']);
 
+    // الأدمن: تغيير الحالة للأمام (State Machine). endpoint واحد فقط
     Route::patch('/orders/{order}/status', [OrderController::class, 'updateStatus'])
         ->middleware('role:admin');
 

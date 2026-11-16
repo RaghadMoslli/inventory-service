@@ -7,7 +7,7 @@ import { ORDER_STATUSES } from '../utils/constants'
 import { formatMoney, formatDateTime, imageUrl } from '../utils/format'
 
 const props = defineProps({ orders: { type: Array, required: true }, busyId: { type: [Number, String], default: null } })
-const emit = defineEmits(['save-status'])
+const emit = defineEmits(['save-status', 'decide'])
 
 const products = useProductStore()
 const open = reactive({})
@@ -77,6 +77,15 @@ watch(signature, () => { for (const k of Object.keys(drafts)) delete drafts[k] }
                   </select>
                   <button class="btn btn-primary !px-3 !py-2 text-xs" :disabled="busyId === o.id || !dirty(o)" @click="emit('save-status', o, draftOf(o))">
                     {{ busyId === o.id ? '...' : 'حفظ' }}
+                  </button>
+                </div>
+                <!-- قرار سريع للطلبات التي بانتظار المسؤول: مرة واحدة فقط -->
+                <div v-if="o.status === 'PENDING'" class="flex items-center gap-2 mt-2">
+                  <button class="btn btn-primary !px-3 !py-1.5 text-xs" :disabled="busyId === o.id" @click="emit('decide', o, 'approved')">
+                    <Icon name="check" size="w-3.5 h-3.5" />موافقة
+                  </button>
+                  <button class="btn btn-danger-soft !px-3 !py-1.5 text-xs" :disabled="busyId === o.id" @click="emit('decide', o, 'rejected')">
+                    <Icon name="x" size="w-3.5 h-3.5" />رفض
                   </button>
                 </div>
               </td>

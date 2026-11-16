@@ -3,6 +3,9 @@
 namespace App\Providers;
 
 use App\Events\OrderCreated;
+use App\Events\OrderStatusChanged;
+use App\Listeners\BroadcastNewOrderToAdmins;
+use App\Listeners\BroadcastOrderUpdateToAdmins;
 use App\Listeners\QueueOrderEmail;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Policies\OrderPolicy;
@@ -33,7 +36,6 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Avoid double-firing when Event::listen is used alongside auto-discovery.
         \Illuminate\Foundation\Support\Providers\EventServiceProvider::disableEventDiscovery();
 
         Gate::policy(Order::class, OrderPolicy::class);
@@ -41,6 +43,10 @@ class AppServiceProvider extends ServiceProvider
         Product::observe(ProductObserver::class);
 
         Event::listen(OrderCreated::class, QueueOrderEmail::class);
+
+        //  بث الطلب الجديد وتحديثاته للمسؤولين
+        Event::listen(OrderCreated::class, BroadcastNewOrderToAdmins::class);
+        Event::listen(OrderStatusChanged::class, BroadcastOrderUpdateToAdmins::class);
 
         if (config('database.connections.pgsql.read') && ! PerfMode::on('replica')) {
             config(['database.connections.pgsql.read' => ['host' => [config('database.connections.pgsql.write.host.0')]]]);

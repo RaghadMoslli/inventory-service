@@ -10,6 +10,7 @@
         "darkaonline/l5-swagger": "^11.3",
         "knuckleswtf/scribe": "^5.11",
         "laravel/framework": "^12.0",
+        "laravel/reverb": "^1.13",
         "laravel/tinker": "^2.10.1",
         "php-open-source-saver/jwt-auth": "^2.7",
         "predis/predis": "^3.7",

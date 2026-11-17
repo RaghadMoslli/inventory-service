@@ -4,6 +4,7 @@ import Icon from './Icon.vue'
 import StatusBadge from './StatusBadge.vue'
 import { useProductStore } from '../stores/products'
 import { ORDER_STATUSES } from '../utils/constants'
+import { nextStatuses } from '../utils/OrderTransitions'
 import { formatMoney, formatDateTime, imageUrl } from '../utils/format'
 
 const props = defineProps({ orders: { type: Array, required: true }, busyId: { type: [Number, String], default: null } })
@@ -16,6 +17,8 @@ const drafts = reactive({})
 const productOf = (id) => products.byId[id]
 const nameOf = (item) => productOf(item.product_id)?.name ?? `منتج #${item.product_id}`
 const draftOf = (o) => drafts[o.id] ?? o.status
+// القائمة: الحالة الحالية + الحالات المسموحة بعدها فقط (الباك إند هو المرجع)
+const optionsOf = (o) => [o.status, ...nextStatuses(o.status)]
 const dirty = (o) => draftOf(o) !== o.status
 const countOf = (o) => (o.items || []).reduce((sum, i) => sum + Number(i.quantity), 0)
 const toggle = (id) => { open[id] = !open[id] }
@@ -73,7 +76,7 @@ watch(signature, () => { for (const k of Object.keys(drafts)) delete drafts[k] }
               <td class="p-4" @click.stop>
                 <div class="flex items-center gap-2">
                   <select :value="draftOf(o)" class="input !w-auto !py-2 !px-3 text-xs" :disabled="busyId === o.id" @change="drafts[o.id] = $event.target.value">
-                    <option v-for="(label, key) in ORDER_STATUSES" :key="key" :value="key">{{ label }}</option>
+                    <option v-for="key in optionsOf(o)" :key="key" :value="key">{{ ORDER_STATUSES[key] }}</option>
                   </select>
                   <button class="btn btn-primary !px-3 !py-2 text-xs" :disabled="busyId === o.id || !dirty(o)" @click="emit('save-status', o, draftOf(o))">
                     {{ busyId === o.id ? '...' : 'حفظ' }}

@@ -93,32 +93,60 @@ class AsyncRealtimeFlowTest extends TestCase
         $customer = User::factory()->create(['role' => 'customer']);
         $order = $this->makeOrder($customer);
 
+        // الموافقة = الانتقال PENDING -> CONFIRMED عبر endpoint الحالة الموحّد
         $this->actingAs($admin, 'api')
-            ->patchJson("/api/v1/admin/orders/{$order->id}/status", ['status' => 'approved', 'note' => 'OK'])
+            ->patchJson("/api/v1/orders/{$order->id}/status", ['status' => 'CONFIRMED', 'note' => 'OK'])
             ->assertOk()
             ->assertJsonPath('data.status', 'CONFIRMED');
 
         $this->assertSame('CONFIRMED', $order->fresh()->status);
 
+        // نفس الانتقال مرة ثانية: 422 (الطلب لم يعد PENDING)
         $this->actingAs($admin, 'api')
-            ->patchJson("/api/v1/admin/orders/{$order->id}/status", ['status' => 'approved'])
+            ->patchJson("/api/v1/orders/{$order->id}/status", ['status' => 'CONFIRMED'])
             ->assertStatus(422)
             ->assertJsonPath('error.code', 'INVALID_TRANSITION');
 
+        // القفز ممنوع: CONFIRMED -> DELIVERED بدون المرور بـ SHIPPED
         $this->actingAs($admin, 'api')
-            ->patchJson("/api/v1/admin/orders/{$order->id}/status", ['status' => 'rejected'])
+            ->patchJson("/api/v1/orders/{$order->id}/status", ['status' => 'DELIVERED'])
             ->assertStatus(422);
 
         $this->assertSame('CONFIRMED', $order->fresh()->status);
 
+        // قيمة غير معروفة
         $this->actingAs($admin, 'api')
-            ->patchJson("/api/v1/admin/orders/{$order->id}/status", ['status' => 'maybe'])
+            ->patchJson("/api/v1/orders/{$order->id}/status", ['status' => 'maybe'])
             ->assertStatus(422);
 
+        // الحدث أُطلق مرة واحدة فقط (للانتقال الناجح)
         Event::assertDispatchedTimes(OrderStatusChanged::class, 1);
         Event::assertDispatched(OrderStatusChanged::class, fn (OrderStatusChanged $e) => $e->oldStatus === 'PENDING'
             && $e->newStatus === 'CONFIRMED'
             && $e->changedBy === $admin->id);
+    }
+
+    public function test_status_cannot_go_backwards_or_leave_final_states(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $customer = User::factory()->create(['role' => 'customer']);
+
+        $cases = [
+            ['CONFIRMED', 'PENDING'],   // رجوع للخلف
+            ['SHIPPED', 'CONFIRMED'],   // رجوع للخلف
+            ['DELIVERED', 'CANCELLED'], // DELIVERED نهائية
+            ['CANCELLED', 'CONFIRMED'], // CANCELLED نهائية (المخزون أُرجع)
+        ];
+
+        foreach ($cases as [$from, $to]) {
+            $order = $this->makeOrder($customer, $from);
+
+            $this->actingAs($admin, 'api')
+                ->patchJson("/api/v1/orders/{$order->id}/status", ['status' => $to])
+                ->assertStatus(422);
+
+            $this->assertSame($from, $order->fresh()->status);
+        }
     }
 
     public function test_rejecting_order_cancels_it_and_releases_reserved_stock(): void
@@ -135,8 +163,9 @@ class AsyncRealtimeFlowTest extends TestCase
 
         $order = $this->makeOrder($customer, 'PENDING', $reservation['reservation_id']);
 
+        // الرفض = الانتقال PENDING -> CANCELLED مع إرجاع المخزون
         $this->actingAs($admin, 'api')
-            ->patchJson("/api/v1/admin/orders/{$order->id}/status", ['status' => 'rejected'])
+            ->patchJson("/api/v1/orders/{$order->id}/status", ['status' => 'CANCELLED'])
             ->assertOk()
             ->assertJsonPath('data.status', 'CANCELLED');
 
@@ -151,7 +180,7 @@ class AsyncRealtimeFlowTest extends TestCase
         $order = $this->makeOrder($customer);
 
         $this->actingAs($customer, 'api')
-            ->patchJson("/api/v1/admin/orders/{$order->id}/status", ['status' => 'approved'])
+            ->patchJson("/api/v1/orders/{$order->id}/status", ['status' => 'CONFIRMED'])
             ->assertForbidden();
 
         $this->assertSame('PENDING', $order->fresh()->status);

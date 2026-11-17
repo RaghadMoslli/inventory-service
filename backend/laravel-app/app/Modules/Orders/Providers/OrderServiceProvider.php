@@ -9,13 +9,13 @@ class OrderServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // تسجيل أي خدمات أو ارتباطات خاصة بموديول الطلبات
+
     }
 
     public function boot(): void
     {
-        // تسجيل مسارات الـ API الخاصة بالطلبات
-        Route::prefix('api')
+
+        Route::prefix('api/v1')
             ->middleware('api')
             ->group(__DIR__ . '/../Routes/api.php');
     }

@@ -1,43 +1,55 @@
 <?php
 
 namespace App\Providers;
-use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Event;
-use Illuminate\Support\ServiceProvider;
-use App\Modules\Orders\Events\OrderCreated;
-use App\Modules\Orders\Events\OrderStatusChanged;
-use App\Modules\Notifications\Listeners\SendOrderNotification;
-use App\Modules\Notifications\Listeners\SendStatusChangedNotification;
+
+use App\Events\OrderCreated;
+use App\Events\OrderStatusChanged;
+use App\Listeners\BroadcastNewOrderToAdmins;
+use App\Listeners\BroadcastOrderUpdateToAdmins;
+use App\Listeners\QueueOrderEmail;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Policies\OrderPolicy;
 use App\Modules\Products\Contracts\StockProvider;
 use App\Modules\Products\Services\FakeStockProvider;
+use App\Modules\Products\Services\GrpcStockProvider;
+use App\Modules\Products\Models\Product;
+use App\Modules\Products\Observers\ProductObserver;
+use App\Support\PerfMode;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
-        $this->app->bind(StockProvider::class, FakeStockProvider::class);
+        $this->app->bind(StockProvider::class, function () {
+            $driver = config('services.inventory.driver', env('INVENTORY_DRIVER', 'grpc'));
+
+            if ($driver === 'fake') {
+                return new FakeStockProvider();
+            }
+
+            return new GrpcStockProvider();
+        });
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
-{
-    Event::listen(
-        OrderCreated::class,
-        SendOrderNotification::class,
-    );
+    {
+        \Illuminate\Foundation\Support\Providers\EventServiceProvider::disableEventDiscovery();
 
-    Event::listen(
-        OrderStatusChanged::class,
-        SendStatusChangedNotification::class,
-    );
+        Gate::policy(Order::class, OrderPolicy::class);
 
-    Gate::policy(Order::class, OrderPolicy::class);
-}
+        Product::observe(ProductObserver::class);
+
+        Event::listen(OrderCreated::class, QueueOrderEmail::class);
+
+        //  بث الطلب الجديد وتحديثاته للمسؤولين
+        Event::listen(OrderCreated::class, BroadcastNewOrderToAdmins::class);
+        Event::listen(OrderStatusChanged::class, BroadcastOrderUpdateToAdmins::class);
+
+        if (config('database.connections.pgsql.read') && ! PerfMode::on('replica')) {
+            config(['database.connections.pgsql.read' => ['host' => [config('database.connections.pgsql.write.host.0')]]]);
+        }
+    }
 }

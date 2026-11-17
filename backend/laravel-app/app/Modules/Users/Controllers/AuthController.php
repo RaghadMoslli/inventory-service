@@ -7,10 +7,29 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use OpenApi\Annotations as OA;
 
 class AuthController extends Controller
 {
-    // تسجيل مستخدم جديد (Customer افتراضياً)
+    /**
+     * @OA\Post(
+     *      path="/api/v1/auth/register",
+     *      summary="تسجيل مستخدم جديد",
+     *      tags={"Auth"},
+     *      @OA\RequestBody(
+     *          required=true,
+     *          @OA\JsonContent(
+     *              required={"name", "email", "password"},
+     *              @OA\Property(property="name", type="string", example="أحمد محمد"),
+     *              @OA\Property(property="email", type="string", format="email", example="ahmad@example.com"),
+     *              @OA\Property(property="password", type="string", format="password", example="secret12345")
+     *          )
+     *      ),
+     *      @OA\Response(response=201, description="تم إنشاء الحساب بنجاح"),
+     *      @OA\Response(response=422, description="خطأ في التحقق من صحة البيانات أو البريد مستخدم مسبقاً")
+     * )
+     */
+
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -33,7 +52,7 @@ class AuthController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role' => 'customer', // دائماً يُسجل كزبون بشكل آمن
+            'role' => 'customer',
         ]);
 
         $token = auth('api')->login($user);
@@ -47,12 +66,28 @@ class AuthController extends Controller
         ], 201);
     }
 
-    // تسجيل الدخول (مع حماية Rate Limiting 5 محاولات)
+    /**
+     * @OA\Post(
+     *      path="/api/v1/auth/login",
+     *      summary="تسجيل الدخول للمستخدم",
+     *      tags={"Auth"},
+     *      @OA\RequestBody(
+     *          required=true,
+     *          @OA\JsonContent(
+     *              required={"email", "password"},
+     *              @OA\Property(property="email", type="string", format="email", example="ahmad@example.com"),
+     *              @OA\Property(property="password", type="string", format="password", example="secret12345")
+     *          )
+     *      ),
+     *      @OA\Response(response=200, description="تم تسجيل الدخول بنجاح وإرجاع التوكن"),
+     *      @OA\Response(response=401, description="بيانات الاعتماد غير صحيحة")
+     * )
+     */
+
     public function login(Request $request)
     {
         $credentials = $request->only('email', 'password');
 
-        // محاولة المصادقة وإخفاء سبب الخطأ (سواء الإيميل أو كلمة المرور خطأ)
         if (! $token = auth('api')->attempt($credentials)) {
             return response()->json([
                 'error' => [
@@ -65,13 +100,33 @@ class AuthController extends Controller
         return $this->respondWithToken($token);
     }
 
-    // جلب بيانات المستخدم الحالي
+    /**
+     * @OA\Get(
+     *      path="/api/v1/me",
+     *      summary="جلب بيانات المستخدم الحالي المسجل دخوله",
+     *      tags={"Auth"},
+     *      security={{"bearerAuth":{}}},
+     *      @OA\Response(response=200, description="تم جلب البيانات بنجاح"),
+     *      @OA\Response(response=401, description="غير مصرح")
+     * )
+     */
+
     public function me()
     {
         return response()->json(auth('api')->user());
     }
 
-    // تسجيل الخروج
+    /**
+     * @OA\Post(
+     *      path="/api/v1/auth/logout",
+     *      summary="تسجيل الخروج وإبطال التوكن",
+     *      tags={"Auth"},
+     *      security={{"bearerAuth":{}}},
+     *      @OA\Response(response=200, description="تم تسجيل الخروج بنجاح"),
+     *      @OA\Response(response=401, description="غير مصرح")
+     * )
+     */
+
     public function logout()
     {
         auth('api')->logout();

@@ -1,0 +1,10 @@
+.gradle/
+build/
+**/vendor/
+**/node_modules/
+**/.env
+**/.idea/
+**/.vscode/
+backend/laravel-app/storage/logs/*
+backend/laravel-app/bootstrap/cache/*.php
+inventory-service/build/

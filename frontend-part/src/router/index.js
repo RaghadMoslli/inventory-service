@@ -26,6 +26,12 @@ const routes = [
         component: () => import('../views/AdminEmailMonitor.vue'),
         meta: { requiresAdmin: true, title: 'مراقبة الإيميلات' },
       },
+      {
+  path: 'admin/system-status',
+  name: 'AdminSystemStatus',
+  component: () => import('../views/AdminSystemStatus.vue'),
+  meta: { requiresAdmin: true, title: 'مراقبة النظام' },
+},
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/' },

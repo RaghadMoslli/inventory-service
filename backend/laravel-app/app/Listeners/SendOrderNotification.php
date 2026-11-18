@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Notifications\Listeners;
+namespace App\Listeners;
 
 use App\Modules\Notifications\Models\Notification;
 use App\Models\User;
@@ -9,7 +9,7 @@ class SendOrderNotification
 {
     public function handle($event)
     {
-        // جلب جميع المشرفين (Admins) لإرسال الإشعار لهم
+
         $admins = User::where('role', 'admin')->get();
 
         foreach ($admins as $admin) {

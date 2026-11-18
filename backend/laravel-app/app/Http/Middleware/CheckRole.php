@@ -10,7 +10,7 @@ class CheckRole
 {
     public function handle(Request $request, Closure $next, string $role): Response
     {
-        // التحقق مما إذا كان المستخدم مسجلاً ودوره يطابق الدور المطلوب
+
         if (!auth('api')->check() || auth('api')->user()->role !== $role) {
             return response()->json([
                 'error' => [

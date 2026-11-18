@@ -29,7 +29,7 @@ class AuthController extends Controller
      *      @OA\Response(response=422, description="خطأ في التحقق من صحة البيانات أو البريد مستخدم مسبقاً")
      * )
      */
-    // تسجيل مستخدم جديد (Customer افتراضياً)
+
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -52,7 +52,7 @@ class AuthController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role' => 'customer', // دائماً يُسجل كزبون بشكل آمن
+            'role' => 'customer',
         ]);
 
         $token = auth('api')->login($user);
@@ -83,12 +83,11 @@ class AuthController extends Controller
      *      @OA\Response(response=401, description="بيانات الاعتماد غير صحيحة")
      * )
      */
-    // تسجيل الدخول (مع حماية Rate Limiting 5 محاولات)
+
     public function login(Request $request)
     {
         $credentials = $request->only('email', 'password');
 
-        // محاولة المصادقة وإخفاء سبب الخطأ (سواء الإيميل أو كلمة المرور خطأ)
         if (! $token = auth('api')->attempt($credentials)) {
             return response()->json([
                 'error' => [
@@ -111,7 +110,7 @@ class AuthController extends Controller
      *      @OA\Response(response=401, description="غير مصرح")
      * )
      */
-    // جلب بيانات المستخدم الحالي
+
     public function me()
     {
         return response()->json(auth('api')->user());
@@ -127,7 +126,7 @@ class AuthController extends Controller
      *      @OA\Response(response=401, description="غير مصرح")
      * )
      */
-    // تسجيل الخروج
+
     public function logout()
     {
         auth('api')->logout();

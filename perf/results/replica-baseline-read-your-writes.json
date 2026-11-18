@@ -1,0 +1,165 @@
+{
+    "root_group": {
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {
+            "setup": {
+                "name": "setup",
+                "path": "::setup",
+                "id": "5c0f8025f7e0b6654089e5b00e950f1a",
+                "groups": {},
+                "checks": {
+                        "login returns 200": {
+                            "fails": 0,
+                            "name": "login returns 200",
+                            "path": "::setup::login returns 200",
+                            "id": "9aeb1edb646b9367e57e5c4c5d6d7f61",
+                            "passes": 1
+                        },
+                        "login response contains access_token": {
+                            "name": "login response contains access_token",
+                            "path": "::setup::login response contains access_token",
+                            "id": "fcb97b7bdf5bb48e70dc61ffa85644aa",
+                            "passes": 1,
+                            "fails": 0
+                        }
+                    }
+            }
+        },
+        "checks": {
+            "product PATCH succeeds": {
+                "name": "product PATCH succeeds",
+                "path": "::product PATCH succeeds",
+                "id": "b42763698654e981e419230fa6455bba",
+                "passes": 1,
+                "fails": 0
+            },
+            "read after write returns 200": {
+                "fails": 0,
+                "name": "read after write returns 200",
+                "path": "::read after write returns 200",
+                "id": "8e1d30becd5aabce6dcd2d6adbc48853",
+                "passes": 1
+            },
+            "read-your-writes returns updated name immediately": {
+                "fails": 0,
+                "name": "read-your-writes returns updated name immediately",
+                "path": "::read-your-writes returns updated name immediately",
+                "id": "f12060eb03c9926fc2c92c2b4acbf2c0",
+                "passes": 1
+            },
+            "original product name restored": {
+                "name": "original product name restored",
+                "path": "::original product name restored",
+                "id": "d4b9f1eb9b30e5bf29ddb7647d829de9",
+                "passes": 1,
+                "fails": 0
+            }
+        }
+    },
+    "metrics": {
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 5,
+            "value": 0
+        },
+        "data_sent": {
+            "count": 2245,
+            "rate": 761.7912130827749
+        },
+        "http_req_tls_handshaking": {
+            "avg": 0,
+            "med": 0,
+            "p(95)": 0,
+            "p(99)": 0,
+            "max": 0
+        },
+        "http_req_duration{expected_response:true}": {
+            "med": 488.7076,
+            "p(95)": 1142.5237399999996,
+            "p(99)": 1261.719548,
+            "max": 1291.5185,
+            "avg": 580.1367600000001
+        },
+        "http_req_receiving": {
+            "avg": 3.9977399999999994,
+            "med": 2.4429,
+            "p(95)": 7.827859999999999,
+            "p(99)": 8.369411999999999,
+            "max": 8.5048
+        },
+        "iterations": {
+            "count": 1,
+            "rate": 0.33932793455802895
+        },
+        "http_req_sending": {
+            "p(99)": 0,
+            "max": 0,
+            "avg": 0,
+            "med": 0,
+            "p(95)": 0
+        },
+        "iteration_duration": {
+            "avg": 1621.7748,
+            "med": 1621.7748,
+            "p(95)": 1621.7748,
+            "p(99)": 1621.7748,
+            "max": 1621.7748
+        },
+        "checks": {
+            "passes": 6,
+            "fails": 0,
+            "value": 1
+        },
+        "vus_max": {
+            "min": 1,
+            "max": 1,
+            "value": 1
+        },
+        "http_req_connecting": {
+            "max": 2.2681,
+            "avg": 1.1990200000000002,
+            "med": 1.1454,
+            "p(95)": 2.10628,
+            "p(99)": 2.235736
+        },
+        "data_received": {
+            "count": 4426,
+            "rate": 1501.865438353836
+        },
+        "http_req_waiting": {
+            "p(99)": 1256.7065360000001,
+            "max": 1286.3984,
+            "avg": 576.13902,
+            "med": 480.2028,
+            "p(95)": 1137.9390799999999
+        },
+        "vus": {
+            "value": 1,
+            "min": 0,
+            "max": 1
+        },
+        "http_reqs": {
+            "count": 5,
+            "rate": 1.6966396727901447
+        },
+        "http_req_duration": {
+            "max": 1291.5185,
+            "avg": 580.1367600000001,
+            "med": 488.7076,
+            "p(95)": 1142.5237399999996,
+            "p(99)": 1261.719548
+        },
+        "http_req_blocked": {
+            "p(99)": 22.986435999999998,
+            "max": 23.8497,
+            "avg": 6.0657,
+            "med": 2.1763,
+            "p(95)": 19.533379999999994
+        }
+    },
+    "setup_data": {
+        "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjgwMDAvYXBpL3YxL2F1dGgvbG9naW4iLCJpYXQiOjE3OTQ0ODUwODQsImV4cCI6MTc5NDQ4ODY4NCwibmJmIjoxNzk0NDg1MDg0LCJqdGkiOiJUaTcxTlVTa3pLRVd1VnE2Iiwic3ViIjoiMiIsInBydiI6IjIzYmQ1Yzg5NDlmNjAwYWRiMzllNzAxYzQwMDg3MmRiN2E1OTc2ZjcifQ.9pehHB9q7YVnrdYlPQ_m_uDUpJwviawMAMBV1yGLE0M"
+    }
+}

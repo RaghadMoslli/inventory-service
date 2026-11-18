@@ -58,6 +58,30 @@ services:
       timeout: 3s
       retries: 10
 
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: ecommerce_rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: ecommerce_mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   inventory-db:
     image: postgres:15-alpine
     container_name: inventory_postgres
@@ -120,10 +144,24 @@ services:
       INVENTORY_GRPC_TIMEOUT_MS: 3000
       INVENTORY_DRIVER: grpc
       PERF_DEBUG: "true"
-      CACHE_STORE: redis                # الكاش في Redis بدل الـ database
+      CACHE_STORE: redis
       REDIS_CLIENT: predis
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      QUEUE_CONNECTION: rabbitmq
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_VHOST: /
+      MAIL_MAILER: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      MAIL_USERNAME: null
+      MAIL_PASSWORD: null
+      MAIL_ENCRYPTION: null
+      MAIL_FROM_ADDRESS: orders@ecommerce.local
+      MAIL_FROM_NAME: Ecommerce Platform
     depends_on:
       db:
         condition: service_healthy
@@ -131,12 +169,66 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
       inventory:
         condition: service_started
     volumes:
       - ./backend/laravel-app:/var/www/html
       - laravel_vendor:/var/www/html/vendor
       - ./inventory-service/proto:/proto:ro
+
+  laravel-queue-emails:
+    build:
+      context: ./backend/laravel-app
+      dockerfile: Dockerfile
+    container_name: ecommerce_laravel_queue_emails
+    command: ["sh", "-c", "php artisan queue:work rabbitmq --queue=emails --sleep=1 --tries=3 --timeout=90 --no-interaction"]
+    restart: unless-stopped
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_KEY: base64:2fl+KtvkdphvQyE8mQqGqzqJb0n5nFqJkqYk3n7p0aE=
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_WRITE_HOST: db
+      DB_READ_HOST: db-replica
+      DB_PORT: 5432
+      DB_DATABASE: ecommerce_platform
+      DB_USERNAME: postgres
+      DB_PASSWORD: secretpassword
+      QUEUE_CONNECTION: rabbitmq
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_VHOST: /
+      CACHE_STORE: redis
+      REDIS_CLIENT: predis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MAIL_MAILER: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      MAIL_USERNAME: null
+      MAIL_PASSWORD: null
+      MAIL_ENCRYPTION: null
+      MAIL_FROM_ADDRESS: orders@ecommerce.local
+      MAIL_FROM_NAME: Ecommerce Platform
+      INVENTORY_DRIVER: fake
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+      laravel-app:
+        condition: service_started
+    volumes:
+      - ./backend/laravel-app:/var/www/html
       - laravel_vendor:/var/www/html/vendor
 
   frontend:

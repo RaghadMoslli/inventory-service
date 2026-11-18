@@ -38,7 +38,7 @@ class PerfSeedCommand extends Command
             if (! $this->option('force') && ! $this->confirm('سيتم حذف كل المنتجات والطلبات وعناصرها الحالية. متابعة؟')) {
                 return self::FAILURE;
             }
-            DB::statement('TRUNCATE order_items, orders, products RESTART IDENTITY');
+            DB::statement('TRUNCATE email_logs, order_items, orders, products RESTART IDENTITY CASCADE');
             $this->components->info('تم تفريغ المنتجات والطلبات.');
         }
 

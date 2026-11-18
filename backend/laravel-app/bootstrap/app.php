@@ -4,6 +4,14 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\SecurityHeadersMiddleware;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Auth\AuthenticationException;
+
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -11,6 +19,10 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+    )
+    ->withBroadcasting(
+        __DIR__.'/../routes/channels.php',
+        ['prefix' => 'api/v1', 'middleware' => ['api', 'auth:api']],
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
@@ -22,25 +34,65 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(\App\Http\Middleware\QueryCountMiddleware::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException $e, $request) {
-            if ($request->is('api/*')) {
+
+        $exceptions->render(function (Throwable $e, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+
+                if ($e instanceof ValidationException) {
+                    return response()->json([
+                        'error' => [
+                            'code' => 'VALIDATION_ERROR',
+                            'message' => 'فشل التحقق من صحة البيانات المدخلة',
+                            'details' => $e->errors(),
+                        ]
+                    ], 422);
+                }
+
+                if ($e instanceof ModelNotFoundException || $e instanceof NotFoundHttpException) {
+                    return response()->json([
+                        'error' => [
+                            'code' => 'NOT_FOUND',
+                            'message' => 'المورد المطلوب غير موجود',
+                        ]
+                    ], 404);
+                }
+
+                if ($e instanceof AuthenticationException) {
+                    return response()->json([
+                        'error' => [
+                            'code' => 'UNAUTHENTICATED',
+                            'message' => 'يجب تسجيل الدخول للوصول إلى هذا المصدر',
+                        ]
+                    ], 401);
+                }
+
+                if ($e instanceof AccessDeniedHttpException) {
+                    return response()->json([
+                        'error' => [
+                            'code' => 'FORBIDDEN',
+                            'message' => 'ليس لديك الصلاحية للقيام بهذا الإجراء',
+                        ]
+                    ], 403);
+                }
+
+                if ($e instanceof MethodNotAllowedHttpException) {
+                    return response()->json([
+                        'error' => [
+                            'code' => 'METHOD_NOT_ALLOWED',
+                            'message' => 'طريقة الطلب (HTTP Method) غير مسجلة لهذا المسار',
+                        ]
+                    ], 405);
+                }
+
+                $statusCode = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
+
                 return response()->json([
                     'error' => [
-                        'code' => 'NOT_FOUND',
-                        'message' => 'المورد المطلوب غير موجود',
+                        'code' => 'SERVER_ERROR',
+                        'message' => $e->getMessage() ?: 'حدث خطأ غير متوقع في الخادم',
                     ]
-                ], 404);
+                ], $statusCode);
             }
         });
 
-        $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, $request) {
-            if ($request->is('api/*')) {
-                return response()->json([
-                    'error' => [
-                        'code' => 'UNAUTHENTICATED',
-                        'message' => 'يجب تسجيل الدخول للوصول إلى هذا المصدر',
-                    ]
-                ], 401);
-            }
-        });
     })->create();

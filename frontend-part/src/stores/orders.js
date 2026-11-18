@@ -30,7 +30,6 @@ export const useOrderStore = defineStore('orders', {
       if (this.currentOrder?.id === order.id) this.currentOrder = { ...this.currentOrder, ...order }
     },
 
-   
     async fetchOrders(page = 1, { silent = false, perPage = 10 } = {}) {
       const key = `${page}:${perPage}`
       if (listRequest && listKey === key) return listRequest
@@ -100,6 +99,7 @@ export const useOrderStore = defineStore('orders', {
       }
     },
 
+    // العميل: PATCH /orders/{id}/cancel (مسموح فقط من PENDING أو CONFIRMED)
     async cancelOrder(id) {
       this.error = null
       try {
@@ -107,12 +107,14 @@ export const useOrderStore = defineStore('orders', {
         this.applyOrder(data.data ?? { id, status: 'CANCELLED' })
         return true
       } catch (error) {
-        this.error = parseApiError(error).message
+        const parsed = parseApiError(error)
+        this.error = parsed.message
+        if (parsed.status === 422) this.fetchOrders(this.pagination.current_page, { silent: true })
         return false
       }
     },
 
-    // PATCH /orders/{id}/status  (للأدمن فقط)
+    // الأدمن: PATCH /orders/{id}/status (للأمام فقط، بدون قفز، State Machine بالباك إند)
     async updateStatus(id, status) {
       this.error = null
       try {
@@ -120,9 +122,17 @@ export const useOrderStore = defineStore('orders', {
         this.applyOrder(data.data ?? { id, status })
         return true
       } catch (error) {
-        this.error = parseApiError(error).message
+        const parsed = parseApiError(error)
+        this.error = parsed.message
+        // 422: مسؤول آخر غيّر الحالة قبلنا، فنزامن القائمة
+        if (parsed.status === 422) this.fetchOrders(this.pagination.current_page, { silent: true })
         return false
       }
+    },
+
+    // للتوافق فقط مع أي استدعاء قديم: approved | rejected. يستدعي نفس endpoint الموحّد.
+    decideOrder(id, decision) {
+      return this.updateStatus(id, decision === 'approved' ? 'CONFIRMED' : 'CANCELLED')
     },
   },
 })

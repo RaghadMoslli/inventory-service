@@ -5,6 +5,7 @@ import { useOrderStore } from './orders'
 import { useProductStore } from './products'
 import { useNotificationStore } from './notifications'
 import { useCartStore } from './cart'
+import { disconnectEcho } from '../plugins/echo'
 const LOCK_KEY = 'login_lock_until'
 
 function readUser() {
@@ -36,7 +37,9 @@ export const useAuthStore = defineStore('auth', {
       useOrderStore().$reset()
       useProductStore().$reset()
       useNotificationStore().$reset()
-      useCartStore().$reset()    },
+      useCartStore().$reset()
+      disconnectEcho() // نغلق اتصال WebSocket حتى لا يبقى توكن المستخدم السابق مفتوحاً
+    },
     setLock(timestamp) {
       this.lockUntil = timestamp
       if (timestamp) localStorage.setItem(LOCK_KEY, String(timestamp))

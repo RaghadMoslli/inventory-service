@@ -17,7 +17,15 @@ COPY . .
 # Laravel routes are under /api/v1 — bake this into the Vite build
 ARG VITE_API_URL=http://localhost:8000/api/v1
 ENV VITE_API_URL=$VITE_API_URL
-
+# إعدادات WebSocket (Reverb) تُخبز داخل البناء مثل VITE_API_URL
+ARG VITE_REVERB_APP_KEY=ecommerce-key
+ARG VITE_REVERB_HOST=localhost
+ARG VITE_REVERB_PORT=8085
+ARG VITE_REVERB_SCHEME=http
+ENV VITE_REVERB_APP_KEY=$VITE_REVERB_APP_KEY \
+    VITE_REVERB_HOST=$VITE_REVERB_HOST \
+    VITE_REVERB_PORT=$VITE_REVERB_PORT \
+    VITE_REVERB_SCHEME=$VITE_REVERB_SCHEME
 RUN npm run build
 
 # ==========================================

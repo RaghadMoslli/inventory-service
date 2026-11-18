@@ -4,10 +4,11 @@ import Icon from './Icon.vue'
 import StatusBadge from './StatusBadge.vue'
 import { useProductStore } from '../stores/products'
 import { ORDER_STATUSES, STATUS_FLOW, CANCELLABLE_STATUSES } from '../utils/constants'
+import { nextStatuses } from '../utils/OrderTransitions'
 import { formatMoney, formatDateTime, imageUrl } from '../utils/format'
 
 const props = defineProps({ order: { type: Object, required: true }, isAdmin: Boolean, busy: Boolean })
-const emit = defineEmits(['cancel', 'save-status'])
+const emit = defineEmits(['cancel', 'save-status', 'decide'])
 
 const products = useProductStore()
 const draft = ref(props.order.status)
@@ -16,6 +17,8 @@ watch(() => props.order.status, (s) => { draft.value = s })
 const productOf = (id) => products.byId[id]
 const stepIndex = computed(() => STATUS_FLOW.indexOf(props.order.status))
 const progressWidth = computed(() => `${(Math.max(stepIndex.value, 0) / (STATUS_FLOW.length - 1)) * 75}%`)
+// القائمة: الحالة الحالية + الحالات المسموحة بعدها فقط (الباك إند هو المرجع)
+const statusOptions = computed(() => [props.order.status, ...nextStatuses(props.order.status)])
 const cancellable = computed(() => CANCELLABLE_STATUSES.includes(props.order.status))
 const itemsCount = computed(() => (props.order.items || []).reduce((sum, i) => sum + Number(i.quantity), 0))
 </script>
@@ -74,11 +77,20 @@ const itemsCount = computed(() => (props.order.items || []).reduce((sum, i) => s
     <footer v-if="isAdmin" class="px-5 py-4 bg-slate-950/40 border-t border-slate-800 flex flex-wrap gap-3 items-center">
       <label class="text-xs font-bold text-slate-400">الحالة</label>
       <select v-model="draft" class="input !w-auto flex-1 min-w-[10rem] !py-2.5">
-        <option v-for="(label, key) in ORDER_STATUSES" :key="key" :value="key">{{ label }}</option>
+        <option v-for="key in statusOptions" :key="key" :value="key">{{ ORDER_STATUSES[key] }}</option>
       </select>
       <button class="btn btn-primary" :disabled="busy || draft === order.status" @click="emit('save-status', order, draft)">
         {{ busy ? 'جاري الحفظ...' : 'حفظ الحالة' }}
       </button>
+      <!-- قرار سريع للطلبات التي بانتظار المسؤول: مرة واحدة فقط -->
+      <div v-if="order.status === 'PENDING'" class="basis-full flex gap-3">
+        <button class="btn btn-primary flex-1" :disabled="busy" @click="emit('decide', order, 'approved')">
+          <Icon name="check" size="w-4 h-4" />موافقة
+        </button>
+        <button class="btn btn-danger-soft flex-1" :disabled="busy" @click="emit('decide', order, 'rejected')">
+          <Icon name="x" size="w-4 h-4" />رفض
+        </button>
+      </div>
     </footer>
 
     <!-- إجراءات العميل -->

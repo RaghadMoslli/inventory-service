@@ -12,11 +12,19 @@ const routes = [
     children: [
       { path: '', name: 'Home', component: () => import('../views/Home.vue'), meta: { title: 'المنتجات' } },
       { path: 'orders', name: 'Orders', component: () => import('../views/Orders.vue'), meta: { title: 'الطلبات' } },
-      { path: 'cart', name: 'Cart', component: () => import('../views/Cart.vue'), meta: { requiresUser: true, title: 'السلة' } },      {
+      { path: 'cart', name: 'Cart', component: () => import('../views/Cart.vue'), meta: { requiresUser: true, title: 'السلة' } },
+      {
         path: 'admin/products/create',
         name: 'AdminAddProduct',
         component: () => import('../views/AdminAddProduct.vue'),
         meta: { requiresAdmin: true, title: 'إضافة منتج' },
+      },
+      { path: 'admin/orders-live', redirect: '/orders' },
+      {
+        path: 'admin/email-monitor',
+        name: 'AdminEmailMonitor',
+        component: () => import('../views/AdminEmailMonitor.vue'),
+        meta: { requiresAdmin: true, title: 'مراقبة الإيميلات' },
       },
     ],
   },

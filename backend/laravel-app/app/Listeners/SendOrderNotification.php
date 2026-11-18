@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Notifications\Listeners;
+namespace App\Listeners;
 
 use App\Modules\Notifications\Models\Notification;
 use App\Models\User;

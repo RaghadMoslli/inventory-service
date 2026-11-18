@@ -16,6 +16,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
+use App\Events\CustomerOrderStatusUpdated;
+use App\Modules\Orders\Models\OrderStatusHistory;
 
 class AsyncRealtimeFlowTest extends TestCase
 {
@@ -185,4 +187,113 @@ class AsyncRealtimeFlowTest extends TestCase
 
         $this->assertSame('PENDING', $order->fresh()->status);
     }
+
+
+public function test_customer_can_view_own_order_status_history(): void
+{
+    $customer = User::factory()->create(['role' => 'customer']);
+    $admin = User::factory()->create(['role' => 'admin']);
+    $order = $this->makeOrder($customer, 'CONFIRMED');
+
+    OrderStatusHistory::create([
+        'order_id' => $order->id,
+        'old_status' => null,
+        'new_status' => 'PENDING',
+        'changed_by' => $customer->id,
+        'note' => 'تم إنشاء الطلب',
+    ]);
+
+    OrderStatusHistory::create([
+        'order_id' => $order->id,
+        'old_status' => 'PENDING',
+        'new_status' => 'CONFIRMED',
+        'changed_by' => $admin->id,
+        'note' => 'تم تأكيد الطلب',
+    ]);
+
+    $this->actingAs($customer, 'api')
+        ->getJson("/api/v1/orders/{$order->id}/history")
+        ->assertOk()
+        ->assertJsonCount(2, 'data')
+        ->assertJsonPath('data.0.old_status', null)
+        ->assertJsonPath('data.0.new_status', 'PENDING')
+        ->assertJsonPath('data.0.changed_by', $customer->name)
+        ->assertJsonPath('data.1.old_status', 'PENDING')
+        ->assertJsonPath('data.1.new_status', 'CONFIRMED')
+        ->assertJsonPath('data.1.changed_by', $admin->name);
+}
+
+public function test_customer_cannot_view_another_customers_order_history(): void
+{
+    $owner = User::factory()->create(['role' => 'customer']);
+    $anotherCustomer = User::factory()->create(['role' => 'customer']);
+
+    $order = $this->makeOrder($owner);
+
+    OrderStatusHistory::create([
+        'order_id' => $order->id,
+        'old_status' => null,
+        'new_status' => 'PENDING',
+        'changed_by' => $owner->id,
+        'note' => 'تم إنشاء الطلب',
+    ]);
+
+    $this->actingAs($anotherCustomer, 'api')
+        ->getJson("/api/v1/orders/{$order->id}/history")
+        ->assertForbidden();
+}
+
+public function test_admin_can_view_customer_order_history(): void
+{
+    $customer = User::factory()->create(['role' => 'customer']);
+    $admin = User::factory()->create(['role' => 'admin']);
+
+    $order = $this->makeOrder($customer);
+
+    OrderStatusHistory::create([
+        'order_id' => $order->id,
+        'old_status' => null,
+        'new_status' => 'PENDING',
+        'changed_by' => $customer->id,
+        'note' => 'تم إنشاء الطلب',
+    ]);
+
+    $this->actingAs($admin, 'api')
+        ->getJson("/api/v1/orders/{$order->id}/history")
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.new_status', 'PENDING');
+}
+
+public function test_order_status_change_broadcasts_to_customers_private_channel(): void
+{
+    Event::fake([CustomerOrderStatusUpdated::class]);
+
+    $customer = User::factory()->create(['role' => 'customer']);
+    $order = $this->makeOrder($customer, 'CONFIRMED');
+
+    event(new OrderStatusChanged(
+        $order,
+        'PENDING',
+        'CONFIRMED',
+        1,
+        'تم تأكيد الطلب'
+    ));
+
+    Event::assertDispatched(
+        CustomerOrderStatusUpdated::class,
+        function (CustomerOrderStatusUpdated $event) use ($order) {
+            return $event->order->id === $order->id
+                && $event->oldStatus === 'PENDING'
+                && $event->newStatus === 'CONFIRMED'
+                && $event->broadcastAs() === 'order.status.changed'
+                && $event->broadcastOn()[0]->name === 'private-orders.' . $order->id
+                && $event->broadcastWith()['order_id'] === $order->id
+                && $event->broadcastWith()['old_status'] === 'PENDING'
+                && $event->broadcastWith()['new_status'] === 'CONFIRMED'
+                && $event->broadcastQueue() === 'broadcasts';
+        }
+    );
+}
+
 }

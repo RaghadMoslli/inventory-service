@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use OpenApi\Annotations as OA;
+use App\Modules\Orders\Models\OrderStatusHistory;
 use RuntimeException;
 
 class OrderController extends Controller
@@ -56,6 +57,33 @@ class OrderController extends Controller
             'data' => $order,
         ]);
     }
+
+
+public function history($id)
+{
+    $order = Order::query()->findOrFail($id);
+
+    $this->authorize('view', $order);
+
+    $history = $order->statusHistories()
+        ->with('changedBy:id,name')
+        ->get()
+        ->map(function ($entry) {
+            return [
+                'id' => $entry->id,
+                'old_status' => $entry->old_status,
+                'new_status' => $entry->new_status,
+                'note' => $entry->note,
+                'changed_by' => $entry->changedBy?->name,
+                'created_at' => $entry->created_at,
+            ];
+        });
+
+    return response()->json([
+        'data' => $history,
+    ]);
+}
+
 
     private function withItems($query)
     {
@@ -140,6 +168,14 @@ class OrderController extends Controller
                     'reservation_id' => $reservationId,
                     'total_amount' => $total,
                 ]);
+
+                OrderStatusHistory::create([
+    'order_id' => $order->id,
+    'old_status' => null,
+    'new_status' => 'PENDING',
+    'changed_by' => $request->user()->id,
+    'note' => 'تم إنشاء الطلب',
+]);
 
                 foreach ($validated['items'] as $item) {
                     $product = $products[$item['product_id']];

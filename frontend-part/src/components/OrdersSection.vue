@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, reactive, onActivated } from 'vue'
+import { ref, computed, reactive, onActivated, onMounted } from 'vue'
 import Icon from './Icon.vue'
 import OrderCard from './OrderCard.vue'
 import OrdersTable from './OrdersTable.vue'
@@ -11,6 +11,7 @@ import { useAuthStore } from '../stores/auth'
 import { useUiStore } from '../stores/ui'
 import { useAutoRefresh } from '../composables/useAutoRefresh'
 import { useAdminOrdersRealtime } from '../composables/useAdminOrdersRealtime'
+import { useCustomerOrdersRealtime } from '../composables/useCustomerOrdersRealtime'
 import { connectionLabel, connectionState } from '../plugins/echo'
 import { ORDER_STATUSES } from '../utils/constants'
 import { formatTime } from '../utils/format'
@@ -36,15 +37,13 @@ const connClass = computed(() => ({ ok: 'text-emerald-300 bg-emerald-950/40 bord
 const dotClass = computed(() => ({ ok: 'bg-emerald-400', warn: 'bg-amber-400 animate-pulse', bad: 'bg-rose-400' }[conn.value.tone]))
 
 if (auth.isAdmin) {
-  // المسؤول: بدون أي استطلاع دوري (polling). تحميل مرة واحدة عند فتح الصفحة،
-  // وبعدها كل التحديثات تصل عبر WebSocket (القناة admin.orders). إن توقف Reverb تتجمّد القائمة.
   useAdminOrdersRealtime()
-  onActivated(() => load())
+  onMounted(() => load())
 } else {
-  // العميل: تحديث كل 15 ثانية وعند العودة للتبويب (إلى أن تُضاف صفحة التتبّع اللحظية)
+  useCustomerOrdersRealtime()
+  onMounted(() => load())
   useAutoRefresh(() => load(), 15000)
 }
-
 function askCancel(order) {
   confirm.order = order
   confirm.status = 'CANCELLED'

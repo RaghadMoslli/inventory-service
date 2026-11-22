@@ -42,7 +42,7 @@ if (auth.isAdmin) {
 } else {
   useCustomerOrdersRealtime()
   onMounted(() => load())
-  useAutoRefresh(() => load(), 15000)
+
 }
 function askCancel(order) {
   confirm.order = order

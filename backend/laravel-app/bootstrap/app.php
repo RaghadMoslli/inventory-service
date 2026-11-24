@@ -32,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(SecurityHeadersMiddleware::class);
         $middleware->append(\App\Http\Middleware\ReadYourWritesMiddleware::class);
         $middleware->append(\App\Http\Middleware\QueryCountMiddleware::class);
+        $middleware->append(\App\Http\Middleware\AddInstanceHeader::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
 

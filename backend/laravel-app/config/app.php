@@ -32,5 +32,6 @@ return [
         'driver' => env('APP_MAINTENANCE_DRIVER', 'file'),
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
+    'instance_name' => env('INSTANCE_NAME', 'unknown'),
 
 ];

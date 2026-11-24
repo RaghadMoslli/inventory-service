@@ -8,6 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 class SendOrderEmailJob implements ShouldQueue
@@ -25,38 +26,75 @@ class SendOrderEmailJob implements ShouldQueue
         $this->afterCommit = true;
     }
 
-    public function handle(): void
-    {
-        logger()->info('EMAIL_JOB_WORKER', [
-            'email_log_id' => $this->emailLogId,
-            'worker' => gethostname(),
-            'timestamp' => now()->toDateTimeString(),
-        ]);
-        
-        $log = EmailLog::query()->with('order.user')->find($this->emailLogId);
+
+public function handle(): void
+{
+    logger()->info('EMAIL_JOB_WORKER', [
+        'email_log_id' => $this->emailLogId,
+        'worker' => gethostname(),
+        'timestamp' => now()->toDateTimeString(),
+    ]);
+
+    DB::transaction(function (): void {
+
+        // Lock the email log row until the transaction finishes.
+        $log = EmailLog::query()
+            ->whereKey($this->emailLogId)
+            ->lockForUpdate()
+            ->first();
+
         if (! $log) {
             return;
         }
 
-        if ($log->isSent()) {
+        // Recheck the status AFTER acquiring the lock.
+        if ($log->isSent() || $log->isDead()) {
+            logger()->info('EMAIL_JOB_SKIPPED', [
+                'email_log_id' => $log->id,
+                'status' => $log->status,
+                'worker' => gethostname(),
+            ]);
+
             return;
         }
 
+        logger()->info('EMAIL_JOB_LOCK_ACQUIRED', [
+            'email_log_id' => $log->id,
+            'worker' => gethostname(),
+        ]);
+
         $log->increment('attempts');
-        $log->refresh();
+
+        $log->load('order.user');
 
         if (! $log->order) {
-            throw new \RuntimeException('Order missing for email log #'.$log->id);
+            throw new \RuntimeException(
+                'Order missing for email log #'.$log->id
+            );
         }
 
-        Mail::to($log->to)->send(new OrderConfirmationMail($log->order));
+        logger()->info('EMAIL_JOB_SEND_ATTEMPT', [
+            'email_log_id' => $log->id,
+            'worker' => gethostname(),
+        ]);
+
+        Mail::to($log->to)->send(
+            new OrderConfirmationMail($log->order)
+        );
 
         $log->update([
             'status' => EmailLog::STATUS_SENT,
             'error' => null,
             'sent_at' => now(),
         ]);
-    }
+
+        logger()->info('EMAIL_JOB_SENT', [
+            'email_log_id' => $log->id,
+            'worker' => gethostname(),
+        ]);
+    });
+}
+
 
     public function failed(?Throwable $exception): void
     {

@@ -18,6 +18,7 @@ use App\Support\PerfMode;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use App\Listeners\BroadcastOrderStatusToCustomer;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -43,6 +44,7 @@ class AppServiceProvider extends ServiceProvider
         Product::observe(ProductObserver::class);
 
         Event::listen(OrderCreated::class, QueueOrderEmail::class);
+        Event::listen(OrderStatusChanged::class, BroadcastOrderStatusToCustomer::class);
 
         //  بث الطلب الجديد وتحديثاته للمسؤولين
         Event::listen(OrderCreated::class, BroadcastNewOrderToAdmins::class);

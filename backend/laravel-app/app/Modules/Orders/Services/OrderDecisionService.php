@@ -9,6 +9,7 @@ use App\Modules\Orders\Models\Order;
 use App\Modules\Products\Contracts\StockProvider;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
+use App\Modules\Orders\Models\OrderStatusHistory;
 
 class OrderDecisionService
 {
@@ -69,6 +70,14 @@ class OrderDecisionService
             }
 
             $order->update(['status' => $newStatus]);
+
+OrderStatusHistory::create([
+    'order_id' => $order->id,
+    'old_status' => $oldStatus,
+    'new_status' => $newStatus,
+    'changed_by' => $actor->id,
+    'note' => $note,
+]);
 
             DB::table('notifications')->insert([
                 'user_id' => $order->user_id,

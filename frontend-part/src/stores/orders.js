@@ -12,6 +12,8 @@ export const useOrderStore = defineStore('orders', {
     orders: [],
     pagination: { current_page: 1, last_page: 1, total: 0, per_page: 10 },
     currentOrder: null,
+    orderHistories: {},
+historyLoading: {},
     loaded: false,
     loading: false,
     creating: false,
@@ -63,6 +65,28 @@ export const useOrderStore = defineStore('orders', {
       })()
       return listRequest
     },
+
+    async fetchOrderHistory(id) {
+  if (!id) return null
+  this.orderHistories ??= {}
+this.historyLoading ??= {}
+
+  this.historyLoading[id] = true
+
+  try {
+    const { data } = await api.get(`/orders/${id}/history`)
+    const history = data.data ?? data
+
+    this.orderHistories[id] = Array.isArray(history) ? history : []
+
+    return this.orderHistories[id]
+  } catch (error) {
+    console.error(`Failed to fetch history for order #${id}`, error)
+    return null
+  } finally {
+    this.historyLoading[id] = false
+  }
+},
 
     async fetchOrder(id) {
       try {

@@ -20,6 +20,7 @@ const links = computed(() => {
   if (auth.isAdmin) {
     items.push({ to: '/admin/products/create', label: 'إضافة منتج', icon: 'plus' })
     items.push({ to: '/admin/email-monitor', label: 'مراقبة الإيميلات', icon: 'mail' })
+    items.push({ to: '/admin/system-status', label: 'مراقبة النظام', icon: 'activity' })
   } else {
     items.push({ to: '/cart', label: 'السلة', icon: 'cart', badge: cart.count })
   }

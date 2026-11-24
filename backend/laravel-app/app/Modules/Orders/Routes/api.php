@@ -12,6 +12,8 @@ Route::middleware('auth:api')->group(function () {
 
     Route::get('/orders/{order}', [OrderController::class, 'show']);
 
+    Route::get('/orders/{order}/history', [OrderController::class, 'history']);
+
     Route::get('/orders/{id}/email-status', [EmailLogController::class, 'orderStatus']);
 
     // العميل: إلغاء من PENDING أو CONFIRMED فقط

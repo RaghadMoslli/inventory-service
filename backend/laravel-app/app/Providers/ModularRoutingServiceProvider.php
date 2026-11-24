@@ -20,5 +20,6 @@ class ModularRoutingServiceProvider extends ServiceProvider
         $apiV1(app_path('Modules/Products/Routes/api.php'));
         $apiV1(app_path('Modules/Notifications/Routes/api.php'));
         $apiV1(app_path('Modules/Orders/Routes/api.php'));
+        $apiV1(app_path('Modules/SystemMonitoring/Routes/api.php'));
     }
 }

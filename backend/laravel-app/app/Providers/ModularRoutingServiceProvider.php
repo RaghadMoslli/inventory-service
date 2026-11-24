@@ -9,7 +9,7 @@ class ModularRoutingServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
-        // API v1: versioned prefix so future /api/v2 can coexist without breaking clients
+
         $apiV1 = function (string $routesFile): void {
             Route::prefix('api/v1')
                 ->middleware('api')

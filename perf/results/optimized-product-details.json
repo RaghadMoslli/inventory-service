@@ -1,0 +1,145 @@
+{
+    "root_group": {
+        "checks": {
+            "product details returns 200": {
+                "path": "::product details returns 200",
+                "id": "b9e9ce9bc21324c4e570e2e9046d409d",
+                "passes": 994,
+                "fails": 0,
+                "name": "product details returns 200"
+            },
+            "product details has product payload": {
+                "name": "product details has product payload",
+                "path": "::product details has product payload",
+                "id": "b12d50435a051cdf5985f93891f0c943",
+                "passes": 994,
+                "fails": 0
+            }
+        },
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {}
+    },
+    "metrics": {
+        "http_req_waiting": {
+            "max": 1446.3742,
+            "avg": 920.791507947686,
+            "med": 1121.9849,
+            "p(95)": 1297.552005,
+            "p(99)": 1375.819538
+        },
+        "http_req_sending": {
+            "max": 0.7393,
+            "avg": 0.044327867203219316,
+            "med": 0,
+            "p(95)": 0.5385049999999999,
+            "p(99)": 0.562014
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 994,
+            "thresholds": {
+                "rate<0.01": false
+            },
+            "value": 0
+        },
+        "http_req_connecting": {
+            "max": 3.1956,
+            "avg": 0.6916649899396392,
+            "med": 0.56865,
+            "p(95)": 1.2748799999999996,
+            "p(99)": 2.164019999999998
+        },
+        "vus_max": {
+            "value": 10,
+            "min": 10,
+            "max": 10
+        },
+        "http_req_blocked": {
+            "avg": 0.8129295774647906,
+            "med": 0.673,
+            "p(95)": 1.3481599999999998,
+            "p(99)": 2.3073859999999975,
+            "max": 15.0002
+        },
+        "http_req_duration": {
+            "max": 1447.8867,
+            "avg": 922.1342907444673,
+            "med": 1122.9753999999998,
+            "p(95)": 1298.376375,
+            "p(99)": 1377.2920689999999
+        },
+        "iteration_duration": {
+            "avg": 923.125704828974,
+            "med": 1123.95395,
+            "p(95)": 1299.13935,
+            "p(99)": 1377.91329,
+            "max": 1449.4361
+        },
+        "iterations": {
+            "count": 994,
+            "rate": 8.279681062520643
+        },
+        "http_req_receiving": {
+            "avg": 1.2984549295774648,
+            "med": 1.27955,
+            "p(95)": 2.1036299999999994,
+            "p(99)": 2.730156999999991,
+            "max": 6.3953
+        },
+        "http_req_duration{expected_response:true}": {
+            "max": 1447.8867,
+            "avg": 922.1342907444673,
+            "med": 1122.9753999999998,
+            "p(95)": 1298.376375,
+            "p(99)": 1377.2920689999999
+        },
+        "data_received": {
+            "count": 725302,
+            "rate": 6041.518344072784
+        },
+        "data_sent": {
+            "count": 112422,
+            "rate": 936.4369259664946
+        },
+        "checks": {
+            "passes": 1988,
+            "fails": 0,
+            "thresholds": {
+                "rate>0.99": false
+            },
+            "value": 1
+        },
+        "app_query_count": {
+            "p(95)": 1,
+            "p(99)": 1,
+            "max": 1,
+            "avg": 1,
+            "med": 1
+        },
+        "vus": {
+            "value": 1,
+            "min": 1,
+            "max": 10
+        },
+        "app_query_time_ms": {
+            "avg": 13.530845070422522,
+            "med": 13.18,
+            "p(95)": 16.02849999999999,
+            "p(99)": 22.718399999999992,
+            "max": 34.93
+        },
+        "http_req_tls_handshaking": {
+            "avg": 0,
+            "med": 0,
+            "p(95)": 0,
+            "p(99)": 0,
+            "max": 0
+        },
+        "http_reqs": {
+            "count": 994,
+            "rate": 8.279681062520643
+        }
+    }
+}

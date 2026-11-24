@@ -7,10 +7,9 @@ use Illuminate\Support\Str;
 
 class FakeStockProvider implements StockProvider
 {
-    /** @var array<int, int> */
+
     private static array $stock = [];
 
-    /** @var array<string, array<int, int>> */
     private static array $reservations = [];
 
     public function getStock(array $productIds): array

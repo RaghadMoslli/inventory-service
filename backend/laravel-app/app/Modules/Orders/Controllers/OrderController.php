@@ -2,112 +2,80 @@
 
 namespace App\Modules\Orders\Controllers;
 
+use App\Events\OrderCreated;
+use App\Exceptions\InvalidOrderTransitionException;
 use App\Http\Controllers\Controller;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
+use App\Modules\Orders\Services\OrderDecisionService;
+use App\Modules\Orders\Support\OrderFeedPayload;
 use App\Modules\Products\Contracts\StockProvider;
 use App\Modules\Products\Models\Product;
+use App\Support\PerfMode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use RuntimeException;
 use OpenApi\Annotations as OA;
+use RuntimeException;
 
 class OrderController extends Controller
 {
     use AuthorizesRequests;
-    
-    public function __construct(protected StockProvider $inventoryGateway)
-    {
+
+    public function __construct(
+        protected StockProvider $inventoryGateway,
+        protected OrderDecisionService $orderDecisions
+    ) {
     }
 
-    /**
-     * @OA\Get(
-     *      path="/api/v1/orders",
-     *      summary="عرض قائمة الطلبات (للمستخدم أو المشرف)",
-     *      tags={"Orders"},
-     *      security={{"bearerAuth":{}}},
-     *      @OA\Parameter(
-     *          name="per_page",
-     *          in="query",
-     *          required=false,
-     *          description="عدد العناصر في الصفحة الواحدة",
-     *          @OA\Schema(type="integer", default=10)
-     *      ),
-     *      @OA\Response(response=200, description="تم جلب قائمة الطلبات بنجاح"),
-     *      @OA\Response(response=401, description="غير مصرح")
-     * )
-     */
     public function index(Request $request)
     {
         $user = $request->user();
 
-        $query = Order::with('items')->latest();
+        $query = $this->withItems(Order::query())->latest();
         if ($user->role !== 'admin') {
             $query->where('user_id', $user->id);
         }
 
+        $orders = $query->paginate($request->integer('per_page', 10));
+        $this->addProductNames($orders->getCollection());
+
         return response()->json([
-            'data' => $query->paginate($request->integer('per_page', 10)),
+            'data' => $orders,
         ]);
     }
 
-    /**
-     * @OA\Get(
-     *      path="/api/v1/orders/{id}",
-     *      summary="عرض تفاصيل طلب محدد",
-     *      tags={"Orders"},
-     *      security={{"bearerAuth":{}}},
-     *      @OA\Parameter(
-     *          name="id",
-     *          in="path",
-     *          required=true,
-     *          description="معرف الطلب",
-     *          @OA\Schema(type="integer")
-     *      ),
-     *      @OA\Response(response=200, description="تم جلب الطلب بنجاح"),
-     *      @OA\Response(response=403, description="غير مسموح لك بعرض هذا الطلب"),
-     *      @OA\Response(response=404, description="الطلب غير موجود")
-     * )
-     */
     public function show($id)
     {
-        $order = Order::with('items')->findOrFail($id);
+        $order = $this->withItems(Order::query())->findOrFail($id);
         $this->authorize('view', $order);
+        $this->addProductNames(collect([$order]));
 
         return response()->json([
             'data' => $order,
         ]);
     }
 
-    /**
-     * @OA\Post(
-     *      path="/api/v1/orders",
-     *      summary="إنشاء طلب جديد وحجز المخزون",
-     *      tags={"Orders"},
-     *      security={{"bearerAuth":{}}},
-     *      @OA\RequestBody(
-     *          required=true,
-     *          @OA\JsonContent(
-     *              required={"items"},
-     *              @OA\Property(
-     *                  property="items",
-     *                  type="array",
-     *                  @OA\Items(
-     *                      required={"product_id", "quantity"},
-     *                      @OA\Property(property="product_id", type="integer", example=1),
-     *                      @OA\Property(property="quantity", type="integer", example=2)
-     *                  )
-     *              )
-     *          )
-     *      ),
-     *      @OA\Response(response=201, description="تم إنشاء الطلب بنجاح"),
-     *      @OA\Response(response=409, description="الكمية غير كافية لبعض المنتجات"),
-     *      @OA\Response(response=503, description="خدمة المخزون غير متاحة حالياً"),
-     *      @OA\Response(response=500, description="فشل حفظ الطلب وتم إرجاع الكمية المحجوزة")
-     * )
-     */
+    private function withItems($query)
+    {
+        if (PerfMode::on('eager_loading')) {
+            return $query->with('items.product:id,name');
+        }
+
+        return $query;
+    }
+
+    private function addProductNames($orders): void
+    {
+        foreach ($orders as $order) {
+            foreach ($order->items as $item) {
+                $item->setAttribute('product_name', $item->product?->name);
+                $item->unsetRelation('product');
+            }
+        }
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -183,7 +151,6 @@ class OrderController extends Controller
                     ]);
                 }
 
-                // 🔔 إنشاء إشعار للمستخدم عند نجاح إنشاء الطلب
                 DB::table('notifications')->insert([
                     'user_id' => $request->user()->id,
                     'type' => 'OrderCreated',
@@ -192,7 +159,6 @@ class OrderController extends Controller
                     'updated_at' => now(),
                 ]);
 
-                // 🔔 فحص المخزون المتبقي وإرسال إشعار للأدمن إذا نفد المنتج تماماً
                 try {
                     $stocks = $this->inventoryGateway->getStock($productIds->toArray());
                     foreach ($validated['items'] as $item) {
@@ -200,7 +166,7 @@ class OrderController extends Controller
                         if (isset($stocks[$prodId]) && $stocks[$prodId] <= 0) {
                             $productName = $products[$prodId]->name ?? "المنتج #{$prodId}";
                             $admins = \App\Models\User::where('role', 'admin')->get();
-                            
+
                             foreach ($admins as $admin) {
                                 DB::table('notifications')->insert([
                                     'user_id' => $admin->id,
@@ -213,7 +179,6 @@ class OrderController extends Controller
                         }
                     }
                 } catch (\Throwable $e) {
-                    // تجاهل خطأ فحص المخزون الثانوي لئلا يعطل العملية الأساسية
                 }
 
                 return $order->load('items');
@@ -222,7 +187,6 @@ class OrderController extends Controller
             try {
                 $this->inventoryGateway->release($reservationId);
             } catch (\Throwable) {
-                // ignore secondary failure
             }
 
             return response()->json([
@@ -234,6 +198,8 @@ class OrderController extends Controller
             ], 500);
         }
 
+        event(new OrderCreated($order));
+
         return response()->json([
             'message' => 'تم إنشاء الطلب بنجاح',
             'data' => $order,
@@ -241,20 +207,17 @@ class OrderController extends Controller
     }
 
     /**
-     * @OA\Post(
+     * @OA\Patch(
      *      path="/api/v1/orders/{id}/cancel",
-     *      summary="إلغاء الطلب وإرجاع المخزون",
+     *      summary="إلغاء الطلب (من PENDING أو CONFIRMED فقط) وإرجاع المخزون",
      *      tags={"Orders"},
      *      security={{"bearerAuth":{}}},
-     *      @OA\Parameter(
-     *          name="id",
-     *          in="path",
-     *          required=true,
-     *          description="معرف الطلب",
-     *          @OA\Schema(type="integer")
-     *      ),
-     *      @OA\Response(response=200, description="تم إلغاء الطلب وإرجاع المخزون بنجاح"),
-     *      @OA\Response(response=404, description="الطلب غير موجود")
+     *      @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *      @OA\Response(response=200, description="تم الإلغاء أو الطلب ملغي مسبقاً"),
+     *      @OA\Response(response=403, description="ليس طلبك"),
+     *      @OA\Response(response=404, description="الطلب غير موجود"),
+     *      @OA\Response(response=422, description="لا يمكن الإلغاء بعد الشحن أو التسليم"),
+     *      @OA\Response(response=503, description="تعذّر إرجاع المخزون")
      * )
      */
     public function cancel(Request $request, $id)
@@ -270,23 +233,22 @@ class OrderController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($order) {
-                if ($order->reservation_id) {
-                    $released = $this->inventoryGateway->release($order->reservation_id);
-                    if (! $released) {
-                        throw new RuntimeException('Inventory release returned false for reservation '.$order->reservation_id);
-                    }
-                }
-                $order->update(['status' => 'CANCELLED']);
-
-                DB::table('notifications')->insert([
-                    'user_id' => $order->user_id,
-                    'type' => 'OrderCancelled',
-                    'message' => 'تم إلغاء الطلب رقم #'.$order->id.' بنجاح وإرجاع المخزون.',
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            });
+            $order = $this->orderDecisions->changeStatus(
+                (int) $id,
+                'CANCELLED',
+                $request->user(),
+                null,
+                'OrderCancelled',
+                'تم إلغاء الطلب رقم #'.$id.' بنجاح وإرجاع المخزون.'
+            );
+        } catch (InvalidOrderTransitionException $e) {
+            return response()->json([
+                'error' => [
+                    'code' => 'INVALID_TRANSITION',
+                    'message' => 'لا يمكن إلغاء الطلب بعد شحنه أو تسليمه',
+                    'current_status' => $e->from,
+                ],
+            ], 422);
         } catch (RuntimeException $e) {
             return response()->json([
                 'error' => [
@@ -303,28 +265,23 @@ class OrderController extends Controller
         ]);
     }
 
-    /**
+       /**
      * @OA\Patch(
      *      path="/api/v1/orders/{id}/status",
-     *      summary="تحديث حالة الطلب (للمشرفين)",
+     *      summary="تغيير حالة الطلب (أدمن فقط، للأمام بدون قفز)",
      *      tags={"Orders"},
      *      security={{"bearerAuth":{}}},
-     *      @OA\Parameter(
-     *          name="id",
-     *          in="path",
-     *          required=true,
-     *          description="معرف الطلب",
-     *          @OA\Schema(type="integer")
-     *      ),
-     *      @OA\RequestBody(
-     *          required=true,
-     *          @OA\JsonContent(
-     *              required={"status"},
-     *              @OA\Property(property="status", type="string", enum={"PENDING","CONFIRMED","SHIPPED","DELIVERED","CANCELLED"}, example="CONFIRMED")
-     *          )
-     *      ),
-     *      @OA\Response(response=200, description="تم تحديث حالة الطلب بنجاح"),
-     *      @OA\Response(response=422, description="خطأ في البيانات المدخلة")
+     *      @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *      @OA\RequestBody(required=true, @OA\JsonContent(
+     *          required={"status"},
+     *          @OA\Property(property="status", type="string", enum={"CONFIRMED","SHIPPED","DELIVERED","CANCELLED"}),
+     *          @OA\Property(property="note", type="string", nullable=true)
+     *      )),
+     *      @OA\Response(response=200, description="تم التحديث"),
+     *      @OA\Response(response=403, description="ليس أدمن"),
+     *      @OA\Response(response=404, description="الطلب غير موجود"),
+     *      @OA\Response(response=422, description="انتقال غير مسموح"),
+     *      @OA\Response(response=503, description="تعذّر إرجاع المخزون")
      * )
      */
     public function updateStatus(Request $request, $id)
@@ -332,35 +289,26 @@ class OrderController extends Controller
         $order = Order::findOrFail($id);
         $this->authorize('updateStatus', $order);
 
-        $request->validate([
+        $validated = $request->validate([
             'status' => 'required|in:PENDING,CONFIRMED,SHIPPED,DELIVERED,CANCELLED',
+            'note' => 'nullable|string|max:500',
         ]);
 
-        $newStatus = $request->status;
-
         try {
-            DB::transaction(function () use ($order, $newStatus) {
-                if ($newStatus === 'CANCELLED' && $order->status !== 'CANCELLED') {
-                    if ($order->reservation_id) {
-                        $released = $this->inventoryGateway->release($order->reservation_id);
-                        if (! $released) {
-                            throw new RuntimeException('Inventory release returned false for reservation '.$order->reservation_id);
-                        }
-                    }
-                }
-
-                $order->update([
-                    'status' => $newStatus,
-                ]);
-
-                DB::table('notifications')->insert([
-                    'user_id' => $order->user_id,
-                    'type' => 'OrderStatusUpdated',
-                    'message' => 'تم تغيير حالة طلبك رقم #'.$order->id.' إلى: '.$newStatus,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            });
+            $order = $this->orderDecisions->changeStatus(
+                (int) $id,
+                $validated['status'],
+                $request->user(),
+                $validated['note'] ?? null
+            );
+        } catch (InvalidOrderTransitionException $e) {
+            return response()->json([
+                'error' => [
+                    'code' => 'INVALID_TRANSITION',
+                    'message' => 'انتقال حالة الطلب غير مسموح',
+                    'current_status' => $e->from,
+                ],
+            ], 422);
         } catch (RuntimeException $e) {
             return response()->json([
                 'error' => [
@@ -371,9 +319,10 @@ class OrderController extends Controller
             ], 503);
         }
 
+        // يحتوي على حقول الطلب العادية (id) وحقول الصفحة اللحظية (order_id) معاً
         return response()->json([
             'message' => 'تم تحديث حالة الطلب بنجاح',
-            'data' => $order->fresh('items'),
+            'data' => array_merge($order->fresh('items')->toArray(), OrderFeedPayload::from($order)),
         ]);
     }
 }

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, reactive, onActivated } from 'vue'
 import Icon from './Icon.vue'
 import OrderCard from './OrderCard.vue'
 import OrdersTable from './OrdersTable.vue'
@@ -10,6 +10,8 @@ import { useOrderStore } from '../stores/orders'
 import { useAuthStore } from '../stores/auth'
 import { useUiStore } from '../stores/ui'
 import { useAutoRefresh } from '../composables/useAutoRefresh'
+import { useAdminOrdersRealtime } from '../composables/useAdminOrdersRealtime'
+import { connectionLabel, connectionState } from '../plugins/echo'
 import { ORDER_STATUSES } from '../utils/constants'
 import { formatTime } from '../utils/format'
 
@@ -20,7 +22,7 @@ const ui = useUiStore()
 const filter = ref('ALL')
 const busyId = ref(null)
 const lastUpdated = ref(null)
-const confirm = reactive({ open: false, order: null, status: null })
+const confirm = reactive({ open: false, order: null, status: null, decision: null })
 
 const visible = computed(() => (filter.value === 'ALL' ? orders.orders : orders.orders.filter((o) => o.status === filter.value)))
 
@@ -29,14 +31,45 @@ async function load(page = orders.pagination.current_page || 1, silent = true) {
   if (result) lastUpdated.value = new Date()
 }
 
-// تحميل فور فتح الصفحة، ثم تحديث كل 15 ثانية وعند العودة للتبويب
-useAutoRefresh(() => load(), 15000)
+const conn = computed(() => connectionLabel(connectionState.value))
+const connClass = computed(() => ({ ok: 'text-emerald-300 bg-emerald-950/40 border-emerald-800/50', warn: 'text-amber-300 bg-amber-950/40 border-amber-800/50', bad: 'text-rose-300 bg-rose-950/40 border-rose-800/50' }[conn.value.tone]))
+const dotClass = computed(() => ({ ok: 'bg-emerald-400', warn: 'bg-amber-400 animate-pulse', bad: 'bg-rose-400' }[conn.value.tone]))
+
+if (auth.isAdmin) {
+  // المسؤول: بدون أي استطلاع دوري (polling). تحميل مرة واحدة عند فتح الصفحة،
+  // وبعدها كل التحديثات تصل عبر WebSocket (القناة admin.orders). إن توقف Reverb تتجمّد القائمة.
+  useAdminOrdersRealtime()
+  onActivated(() => load())
+} else {
+  // العميل: تحديث كل 15 ثانية وعند العودة للتبويب (إلى أن تُضاف صفحة التتبّع اللحظية)
+  useAutoRefresh(() => load(), 15000)
+}
 
 function askCancel(order) {
   confirm.order = order
   confirm.status = 'CANCELLED'
+  confirm.decision = null
   confirm.open = true
 }
+function requestDecision(order, decision) {
+  if (decision === 'rejected') {
+    confirm.order = order
+    confirm.status = null
+    confirm.decision = 'rejected'
+    confirm.open = true
+  } else {
+    runDecision(order, decision)
+  }
+}
+
+async function runDecision(order, decision) {
+  busyId.value = order.id
+  const ok = await orders.decideOrder(order.id, decision)
+  busyId.value = null
+  if (ok) ui.success(decision === 'approved' ? `تمت الموافقة على الطلب #${order.id}` : `تم رفض الطلب #${order.id} وإرجاع الكمية للمخزون`)
+  else ui.error(orders.error)
+}
+
 function requestStatus(order, status) {
   if (status === 'CANCELLED') askCancel(order)
   else run(order, status)
@@ -51,9 +84,10 @@ async function run(order, status) {
 }
 
 async function confirmRun() {
-  const { order, status } = confirm
+  const { order, status, decision } = confirm
   confirm.open = false
-  await run(order, status)
+  if (decision) await runDecision(order, decision)
+  else await run(order, status)
 }
 </script>
 
@@ -68,6 +102,10 @@ async function confirmRun() {
         </p>
       </div>
       <div class="flex items-center gap-3">
+        <span v-if="auth.isAdmin" class="inline-flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-full border" :class="connClass" data-testid="ws-status">
+          <span class="w-2 h-2 rounded-full" :class="dotClass"></span>
+          WebSocket: {{ conn.text }}
+        </span>
         <span v-if="lastUpdated" class="text-[11px] text-slate-500">آخر تحديث {{ formatTime(lastUpdated) }}</span>
         <button class="btn btn-ghost" :disabled="orders.loading" @click="load(orders.pagination.current_page, false)">
           <Icon name="refresh" size="w-4 h-4" :class="orders.loading ? 'animate-spin' : ''" />تحديث
@@ -100,10 +138,10 @@ async function confirmRun() {
       <!-- الأدمن: جدول على الشاشات الكبيرة، وبطاقات على الجوال -->
       <template v-if="auth.isAdmin">
         <div class="hidden md:block">
-          <OrdersTable v-if="visible.length" :orders="visible" :busy-id="busyId" @save-status="requestStatus" />
+          <OrdersTable v-if="visible.length" :orders="visible" :busy-id="busyId" @save-status="requestStatus" @decide="requestDecision" />
         </div>
         <div class="md:hidden space-y-4">
-          <OrderCard v-for="o in visible" :key="o.id" :order="o" is-admin :busy="busyId === o.id" @save-status="requestStatus" />
+          <OrderCard v-for="o in visible" :key="o.id" :order="o" is-admin :busy="busyId === o.id" @save-status="requestStatus" @decide="requestDecision" />
         </div>
       </template>
 
@@ -118,9 +156,9 @@ async function confirmRun() {
 
     <ConfirmModal
       :open="confirm.open"
-      title="إلغاء الطلب"
-      :message="`سيتم إلغاء الطلب #${confirm.order?.id ?? ''} وإرجاع الكمية المحجوزة إلى المخزون. لا يمكن التراجع عن هذه العملية.`"
-      confirm-text="نعم، إلغاء الطلب"
+      :title="confirm.decision ? 'رفض الطلب' : 'إلغاء الطلب'"
+      :message="`سيتم ${confirm.decision ? 'رفض' : 'إلغاء'} الطلب #${confirm.order?.id ?? ''} وإرجاع الكمية المحجوزة إلى المخزون. لا يمكن التراجع عن هذه العملية.`"
+      :confirm-text="confirm.decision ? 'نعم، رفض الطلب' : 'نعم، إلغاء الطلب'"
       danger
       @confirm="confirmRun"
       @close="confirm.open = false"

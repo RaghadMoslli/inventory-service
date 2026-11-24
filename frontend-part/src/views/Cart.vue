@@ -1,33 +1,63 @@
 <script setup>
-import { ref, onActivated } from 'vue'
+import { ref, onActivated, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import Icon from '../components/Icon.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { useCartStore } from '../stores/cart'
 import { useOrderStore } from '../stores/orders'
+import { useEmailStore } from '../stores/emails'
 import { useUiStore } from '../stores/ui'
 import { imageUrl, formatMoney } from '../utils/format'
 
 const router = useRouter()
 const cart = useCartStore()
 const orders = useOrderStore()
+const emails = useEmailStore()
 const ui = useUiStore()
 const errorMsg = ref('')
+const lastOrder = ref(null)
+const emailStatus = ref(null)
+const createdInMs = ref(null)
+let pollTimer = null
+
+const emailLabel = {
+  queued: 'قيد الإرسال',
+  sent: 'تم إرسال الإيميل',
+  failed: 'فشل مؤقت',
+  dead: 'فشل نهائي',
+  unknown: 'بانتظار الحالة',
+}
 
 onActivated(() => cart.refresh())
+onBeforeUnmount(() => clearInterval(pollTimer))
+
+async function pollEmail(orderId) {
+  clearInterval(pollTimer)
+  const tick = async () => {
+    const status = await emails.fetchOrderEmailStatus(orderId)
+    if (status) emailStatus.value = status.status
+    if (status?.status === 'sent' || status?.status === 'dead') clearInterval(pollTimer)
+  }
+  await tick()
+  pollTimer = setInterval(tick, 2000)
+}
+
 async function checkout() {
   if (!cart.canCheckout || orders.creating) return
   errorMsg.value = ''
   const kinds = cart.items.length
-  // طلب واحد يحتوي كل المنتجات (Order واحد + Order Items متعددة)
+  const started = performance.now()
   const order = await orders.createOrder(cart.items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })))
+  createdInMs.value = Math.round(performance.now() - started)
   if (order) {
     cart.clear()
+    lastOrder.value = order
+    emailStatus.value = 'queued'
     ui.success(`تم إنشاء الطلب #${order.id} ويحتوي ${kinds} منتج`)
-    router.push({ name: 'Orders' })
+    pollEmail(order.id)
   } else {
     errorMsg.value = orders.error
-    cart.refresh() // لتحديث الكميات إذا كان السبب نقص المخزون
+    cart.refresh()
   }
 }
 </script>
@@ -39,11 +69,24 @@ async function checkout() {
       <p class="text-sm text-slate-400 mt-1">راجع منتجاتك وكمياتها، ثم أكّد الطلب مرة واحدة لكل المنتجات.</p>
     </div>
 
-    <EmptyState v-if="!cart.items.length" icon="inbox" title="السلة فارغة" text="أضف منتجات من صفحة المنتجات ثم عد هنا لتأكيد الطلب.">
+    <div v-if="lastOrder" class="card p-4 border border-emerald-800/50 bg-emerald-950/20 space-y-2">
+      <p class="text-emerald-300 font-bold">تم استلام طلبك #{{ lastOrder.id }}{{ createdInMs != null ? ` خلال ${createdInMs} ms` : '' }}</p>
+      <p class="text-sm text-slate-300">
+        حالة الإيميل:
+        <span class="font-extrabold" :class="{
+          'text-amber-300': emailStatus === 'queued',
+          'text-emerald-300': emailStatus === 'sent',
+          'text-rose-300': emailStatus === 'dead' || emailStatus === 'failed',
+        }">{{ emailLabel[emailStatus] || emailStatus }}</span>
+      </p>
+      <router-link to="/orders" class="text-xs text-purple-300 hover:text-purple-200 font-bold">عرض طلباتي</router-link>
+    </div>
+
+    <EmptyState v-if="!cart.items.length && !lastOrder" icon="inbox" title="السلة فارغة" text="أضف منتجات من صفحة المنتجات ثم عد هنا لتأكيد الطلب.">
       <router-link to="/" class="btn btn-primary">تصفح المنتجات</router-link>
     </EmptyState>
 
-    <div v-else class="grid lg:grid-cols-[1fr_22rem] gap-6 items-start">
+    <div v-if="cart.items.length" class="grid lg:grid-cols-[1fr_22rem] gap-6 items-start">
       <ul class="space-y-3">
         <li
           v-for="item in cart.items"

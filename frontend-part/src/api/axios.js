@@ -3,6 +3,8 @@ import { getEtag, setEtag } from '../utils/etagCache'
 
 const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '')
 
+export const API_BASE_URL = BASE_URL
+
 export const API_ORIGIN = (() => {
   try { return new URL(BASE_URL).origin } catch { return 'http://localhost:8000' }
 })()

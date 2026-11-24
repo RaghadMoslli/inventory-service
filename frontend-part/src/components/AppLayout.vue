@@ -17,8 +17,12 @@ const links = computed(() => {
     { to: '/', label: 'المنتجات', icon: 'bag', exact: true },
     { to: '/orders', label: auth.isAdmin ? 'إدارة الطلبات' : 'طلباتي', icon: 'orders' },
   ]
-  if (auth.isAdmin) items.push({ to: '/admin/products/create', label: 'إضافة منتج', icon: 'plus' })
-  else items.push({ to: '/cart', label: 'السلة', icon: 'cart', badge: cart.count })
+  if (auth.isAdmin) {
+    items.push({ to: '/admin/products/create', label: 'إضافة منتج', icon: 'plus' })
+    items.push({ to: '/admin/email-monitor', label: 'مراقبة الإيميلات', icon: 'mail' })
+  } else {
+    items.push({ to: '/cart', label: 'السلة', icon: 'cart', badge: cart.count })
+  }
     return items
 })
 

@@ -271,21 +271,25 @@
                         "/api/v1/orders/{id}/cancel": {
                             "patch": {
                                 "tags": ["Orders"],
-                                "summary": "إلغاء الطلب وإرجاع المخزون",
+                                "summary": "إلغاء الطلب وإرجاع المخزون (من PENDING أو CONFIRMED فقط)",
                                 "security": [{"bearerAuth": []}],
                                 "parameters": [
                                     {"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}
                                 ],
                                 "responses": {
                                     "200": {"description": "تم إلغاء الطلب وإرجاع المخزون بنجاح"},
-                                    "404": {"description": "الطلب غير موجود"}
+                                    "403": {"description": "ليس طلبك"},
+                                    "404": {"description": "الطلب غير موجود"},
+                                    "422": {"description": "لا يمكن الإلغاء بعد الشحن أو التسليم (INVALID_TRANSITION)"},
+                                    "503": {"description": "تعذّر إرجاع المخزون، الطلب لم يتغيّر"}
                                 }
                             }
                         },
                         "/api/v1/orders/{id}/status": {
                             "patch": {
                                 "tags": ["Orders"],
-                                "summary": "تحديث حالة الطلب (للمشرفين)",
+                                "summary": "تغيير حالة الطلب (للمشرفين): للأمام فقط بدون قفز",
+                                "description": "الانتقالات المسموحة: PENDING ← CONFIRMED أو CANCELLED، CONFIRMED ← SHIPPED أو CANCELLED، SHIPPED ← DELIVERED. الحالتان DELIVERED وCANCELLED نهائيتان. الانتقال غير المسموح يرجع 422. الإلغاء يرجّع المخزون المحجوز.",
                                 "security": [{"bearerAuth": []}],
                                 "parameters": [
                                     {"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}
@@ -300,8 +304,13 @@
                                                 "properties": {
                                                     "status": {
                                                         "type": "string",
-                                                        "enum": ["PENDING", "CONFIRMED", "SHIPPED", "DELIVERED", "CANCELLED"],
+                                                        "enum": ["CONFIRMED", "SHIPPED", "DELIVERED", "CANCELLED"],
                                                         "example": "CONFIRMED"
+                                                    },
+                                                    "note": {
+                                                        "type": "string",
+                                                        "nullable": true,
+                                                        "example": "تمت المراجعة"
                                                     }
                                                 }
                                             }
@@ -310,7 +319,38 @@
                                 },
                                 "responses": {
                                     "200": {"description": "تم تحديث حالة الطلب بنجاح"},
-                                    "422": {"description": "خطأ في البيانات المدخلة"}
+                                    "403": {"description": "ليس أدمن"},
+                                    "404": {"description": "الطلب غير موجود"},
+                                    "422": {"description": "قيمة غير معروفة، أو انتقال غير مسموح (INVALID_TRANSITION)"},
+                                    "503": {"description": "تعذّر إرجاع المخزون عند الإلغاء، الطلب لم يتغيّر"}
+                                }
+                            }
+                        },
+                        "/api/v1/broadcasting/auth": {
+                            "post": {
+                                "tags": ["Broadcasting"],
+                                "summary": "تفويض الاشتراك بقناة WebSocket خاصة",
+                                "description": "تستدعيه مكتبة Echo تلقائياً قبل الاشتراك بأي قناة خاصة. القناة private-admin.orders للأدمن فقط. عند النجاح يرجع توقيعاً (auth) يقبله سيرفر Reverb.",
+                                "security": [{"bearerAuth": []}],
+                                "requestBody": {
+                                    "required": true,
+                                    "content": {
+                                        "application/json": {
+                                            "schema": {
+                                                "type": "object",
+                                                "required": ["socket_id", "channel_name"],
+                                                "properties": {
+                                                    "socket_id": {"type": "string", "example": "123.456"},
+                                                    "channel_name": {"type": "string", "example": "private-admin.orders"}
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "responses": {
+                                    "200": {"description": "مسموح: يرجع {\"auth\": \"key:signature\"}"},
+                                    "401": {"description": "بدون توكن أو توكن غير صالح"},
+                                    "403": {"description": "ليس أدمن (غير مسموح له بقناة المسؤولين)"}
                                 }
                             }
                         },
@@ -338,11 +378,20 @@
                         }
                     }
                 },
-                dom_id: '#swagger-ui',
-                deepLinking: true,
-                presets: [
-                    SwaggerUIBundle.presets.apis
-                ],
+            dom_id: '#swagger-ui',
+deepLinking: true,
+
+requestInterceptor: (request) => {
+    if (request.url.includes('/api/v1/broadcasting/auth')) {
+        request.headers = request.headers || {};
+        request.headers['accept'] = 'application/json';
+    }
+
+    return request;
+},
+presets: [
+    SwaggerUIBundle.presets.apis
+],
             });
         };
     </script>

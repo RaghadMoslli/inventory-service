@@ -2,7 +2,7 @@ x-laravel-env: &laravel-env
   APP_ENV: local
   APP_DEBUG: "true"
   APP_KEY: base64:2fl+KtvkdphvQyE8mQqGqzqJb0n5nFqJkqYk3n7p0aE=
-  JWT_SECRET: ${JWT_SECRET}
+  JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is missing - add it to the root .env file}"
   DB_CONNECTION: pgsql
   DB_HOST: db                       # السيرفر الرئيسي افتراضياً
   DB_WRITE_HOST: db                 # سيرفر الكتابة
@@ -69,6 +69,21 @@ x-laravel-common: &laravel-common
     - ./backend/laravel-app:/var/www/html
     - laravel_vendor:/var/www/html/vendor
     - ./inventory-service/proto:/proto:ro
+
+x-laravel-worker: &laravel-worker
+  image: ecommerce-laravel-app:latest
+  command: ["sh", "-c", "php artisan queue:work rabbitmq --queue=emails --sleep=1 --tries=3 --timeout=90 --no-interaction"]
+  restart: unless-stopped
+  depends_on:
+    db:
+      condition: service_healthy
+    rabbitmq:
+      condition: service_healthy
+    migrate:
+      condition: service_completed_successfully
+  volumes:
+    - ./backend/laravel-app:/var/www/html
+    - laravel_vendor:/var/www/html/vendor
 
 services:
   db:
@@ -248,54 +263,14 @@ services:
     ports:
       - "8003:8000"
 
+ 
+  # --- Email Queue Worker: 3 replicas ---
   laravel-queue-emails:
-    build:
-      context: ./backend/laravel-app
-      dockerfile: Dockerfile
-    container_name: ecommerce_laravel_queue_emails
-    command: ["sh", "-c", "php artisan queue:work rabbitmq --queue=emails --sleep=1 --tries=3 --timeout=90 --no-interaction"]
-    restart: unless-stopped
+    <<: *laravel-worker
     environment:
-      APP_ENV: local
-      APP_DEBUG: "true"
-      APP_KEY: base64:2fl+KtvkdphvQyE8mQqGqzqJb0n5nFqJkqYk3n7p0aE=
-      DB_CONNECTION: pgsql
-      DB_HOST: db
-      DB_WRITE_HOST: db
-      DB_READ_HOST: db-replica
-      DB_PORT: 5432
-      DB_DATABASE: ecommerce_platform
-      DB_USERNAME: postgres
-      DB_PASSWORD: secretpassword
-      QUEUE_CONNECTION: rabbitmq
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: guest
-      RABBITMQ_PASSWORD: guest
-      RABBITMQ_VHOST: /
-      CACHE_STORE: redis
-      REDIS_CLIENT: predis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      # Gmail SMTP (قيم من ملف .env بجذر المشروع)
-      MAIL_MAILER: smtp
-      MAIL_HOST: smtp.gmail.com
-      MAIL_PORT: 587
-      MAIL_USERNAME: ${MAIL_USERNAME}
-      MAIL_PASSWORD: ${MAIL_PASSWORD}
-      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS}
-      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Ecommerce Platform}
+      <<: *laravel-env
       INVENTORY_DRIVER: fake
-    depends_on:
-      db:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-    volumes:
-      - ./backend/laravel-app:/var/www/html
-      - laravel_vendor:/var/www/html/vendor
+
 
   # --- [غالية] سيرفر WebSocket (Laravel Reverb) ---
   reverb:
@@ -392,7 +367,7 @@ services:
     ports:
       - "5173:80"
     depends_on:
-      - app1
+      - nginx
 
   frontend-dev:
     image: node:22-alpine
@@ -411,11 +386,11 @@ services:
     ports:
       - "5174:5173"
     depends_on:
-      - app1
+      - nginx
 
 volumes:
   postgres_data:
-  postgres_replica_data:   # --- [إضافة ذاكرة الحاوية الجديدة] ---
+  postgres_replica_data:   
   inventory_postgres_data:
   laravel_vendor:
   frontend_node_modules:

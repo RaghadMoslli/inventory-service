@@ -27,6 +27,12 @@ class SendOrderEmailJob implements ShouldQueue
 
     public function handle(): void
     {
+        logger()->info('EMAIL_JOB_WORKER', [
+            'email_log_id' => $this->emailLogId,
+            'worker' => gethostname(),
+            'timestamp' => now()->toDateTimeString(),
+        ]);
+        
         $log = EmailLog::query()->with('order.user')->find($this->emailLogId);
         if (! $log) {
             return;

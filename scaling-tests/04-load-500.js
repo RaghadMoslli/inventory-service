@@ -8,10 +8,13 @@ const TOTAL = Number(__ENV.TOTAL || 500);
 const VUS = Number(__ENV.VUS || 50);
 const RUN = __ENV.RUN || 's1';
 
-const byInstance = new Counter('by_instance');
 const status201 = new Counter('status_201');
 const status409 = new Counter('status_409');
 const statusOther = new Counter('status_other');
+const instApp1 = new Counter('inst_app1');
+const instApp2 = new Counter('inst_app2');
+const instApp3 = new Counter('inst_app3');
+const instUnknown = new Counter('inst_unknown');
 
 export const options = {
   scenarios: {
@@ -78,8 +81,11 @@ export default function (data) {
     },
   );
 
-  const inst = res.headers['X-Instance'] || res.headers['x-instance'] || 'unknown';
-  byInstance.add(1, { instance: String(inst) });
+  const inst = String(res.headers['X-Instance'] || res.headers['x-instance'] || 'unknown');
+  if (inst === 'app1') instApp1.add(1);
+  else if (inst === 'app2') instApp2.add(1);
+  else if (inst === 'app3') instApp3.add(1);
+  else instUnknown.add(1);
 
   if (res.status === 201) status201.add(1);
   else if (res.status === 409) status409.add(1);
@@ -93,20 +99,19 @@ export default function (data) {
 }
 
 export function handleSummary(data) {
+  const count = (name) => data.metrics[name]?.values?.count ?? 0;
   const lines = [];
   lines.push(`RUN=${RUN} TOTAL=${TOTAL} VUS=${VUS} PRODUCT_ID=${PRODUCT_ID}`);
   lines.push(`http_reqs=${data.metrics.http_reqs?.values?.count ?? 'n/a'}`);
-  lines.push(`status_201=${data.metrics.status_201?.values?.count ?? 0}`);
-  lines.push(`status_409=${data.metrics.status_409?.values?.count ?? 0}`);
-  lines.push(`status_other=${data.metrics.status_other?.values?.count ?? 0}`);
+  lines.push(`status_201=${count('status_201')}`);
+  lines.push(`status_409=${count('status_409')}`);
+  lines.push(`status_other=${count('status_other')}`);
   lines.push(`p95=${data.metrics.http_req_duration?.values['p(95)'] ?? 'n/a'}`);
-
-  // Instance distribution from tagged counters
-  for (const [name, metric] of Object.entries(data.metrics)) {
-    if (name.startsWith('by_instance{') || name === 'by_instance') {
-      lines.push(`${name}=${metric.values?.count ?? 0}`);
-    }
-  }
+  lines.push('==== X-Instance distribution ====');
+  lines.push(`app1=${count('inst_app1')}`);
+  lines.push(`app2=${count('inst_app2')}`);
+  lines.push(`app3=${count('inst_app3')}`);
+  lines.push(`unknown=${count('inst_unknown')}`);
 
   return { stdout: lines.join('\n') + '\n' };
 }

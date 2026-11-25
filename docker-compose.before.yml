@@ -1,0 +1,18 @@
+# ===== محاكاة "قبل": نسخة app2 تحفظ الحالة محلياً (Stateful) =====
+# الهدف: إثبات المشاكل الخفية بدليل قبل ما نصلحها. هذا الملف "يكسر" app2 عمداً.
+# التشغيل:
+#   docker compose -f docker-compose.yml -f docker-compose.before.yml up -d
+# ⚠️ لا تستخدميه لاختبار الـ Rate Limit (02) — شغّلي ذاك الاختبار بالوضع العادي.
+# بعد انتهاء التجارب: رجّعي الوضع الطبيعي
+#   docker compose -f docker-compose.yml -f docker-compose.after.yml up -d
+#
+# ما يفعله: يجعل app2 كأنها سيرفر منفصل تماماً:
+#  - cache على ملفات داخل tmpfs خاص بها (JWT blacklist لا يكون مشتركاً)
+#  - storage/app (ملف perf-mode.json + صور المنتجات) على tmpfs خاص بها
+services:
+  app2:
+    environment:
+      CACHE_STORE: file
+    tmpfs:
+      - /var/www/html/storage/framework/cache/data
+      - /var/www/html/storage/app

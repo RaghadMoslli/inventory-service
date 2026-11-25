@@ -25,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ['prefix' => 'api/v1', 'middleware' => ['api', 'auth:api']],
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->trustProxies(at: '*');
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckRole::class,
             'etag' => \App\Http\Middleware\ETagMiddleware::class,
@@ -35,7 +36,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(\App\Http\Middleware\AddInstanceHeader::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-
+        
         $exceptions->render(function (Throwable $e, Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
 

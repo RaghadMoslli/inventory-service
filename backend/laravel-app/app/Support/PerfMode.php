@@ -2,8 +2,21 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Facades\Redis;
+use Throwable;
+
+/**
+ * أعلام وضع الأداء (baseline / optimized).
+ *
+ * قبل (الطلب 5): كانت الحالة تُحفظ بملف storage/app/perf-mode.json على قرص النسخة
+ * => لو شغّلنا perf:mode على نسخة واحدة، باقي النسخ ما بتعرف (Stateful).
+ *
+ * بعد (الطلب 5): الحالة بمكان مشترك واحد = Redis، فكل النسخ تقرأ نفس القيمة (Stateless).
+ */
 class PerfMode
 {
+    /** مفتاح Redis المشترك */
+    public const REDIS_KEY = 'perf:mode:flags';
 
     private static ?array $cache = null;
 
@@ -16,14 +29,11 @@ class PerfMode
         $flags = array_fill_keys(config('perf.flags', []), true);
 
         if (! app()->isProduction()) {
-            $file = config('perf.state_file');
-            if (is_string($file) && is_file($file)) {
-                $data = json_decode((string) @file_get_contents($file), true);
-                if (is_array($data)) {
-                    foreach ($flags as $name => $_) {
-                        if (array_key_exists($name, $data)) {
-                            $flags[$name] = (bool) $data[$name];
-                        }
+            $data = self::readShared();
+            if (is_array($data)) {
+                foreach ($flags as $name => $_) {
+                    if (array_key_exists($name, $data)) {
+                        $flags[$name] = (bool) $data[$name];
                     }
                 }
             }
@@ -39,13 +49,7 @@ class PerfMode
 
     public static function save(array $flags): void
     {
-        $file = config('perf.state_file');
-        $dir = dirname($file);
-        if (! is_dir($dir)) {
-            mkdir($dir, 0775, true);
-        }
-
-        file_put_contents($file, json_encode($flags, JSON_PRETTY_PRINT), LOCK_EX);
+        Redis::set(self::REDIS_KEY, json_encode($flags));
         self::forget();
     }
 
@@ -65,5 +69,21 @@ class PerfMode
     public static function forget(): void
     {
         self::$cache = null;
+    }
+
+    private static function readShared(): ?array
+    {
+        try {
+            $raw = Redis::get(self::REDIS_KEY);
+            if (! is_string($raw) || $raw === '') {
+                return null;
+            }
+            $data = json_decode($raw, true);
+
+            return is_array($data) ? $data : null;
+        } catch (Throwable) {
+            // لو Redis غير متاح لا نكسر الطلب: نرجع للقيم الافتراضية (كل التحسينات مفعلة)
+            return null;
+        }
     }
 }

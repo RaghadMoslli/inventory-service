@@ -1,0 +1,33 @@
+# ===== إصلاحات الـ Stateless (حالة "بعد") =====
+# التشغيل:
+#   docker compose -f docker-compose.yml -f docker-compose.after.yml up -d --build
+#
+# ملاحظة: عمل شهد الأصلي لا يتغير. هذا الملف يضيف فوقه (Override) فقط.
+# بعد ما تنجحي بالاختبارات، انقلي هذه الإعدادات إلى docker-compose.yml الأساسي واحذفي هذا الملف.
+
+x-session-redis: &session-redis
+  SESSION_DRIVER: redis          # كانت database (مشتركة لكن الأستاذ طلب Redis)
+  CACHE_STORE: redis             # نثبّته صراحةً: الـ JWT blacklist يُخزَّن هنا
+  INVENTORY_DRIVER: grpc         # كل النسخ على خدمة المخزون المركزية (Spring)، لا Fake بالذاكرة
+
+services:
+  app1:
+    environment: *session-redis
+    volumes:
+      - product_uploads:/var/www/html/storage/app/public
+  app2:
+    environment: *session-redis
+    volumes:
+      - product_uploads:/var/www/html/storage/app/public
+  app3:
+    environment: *session-redis
+    volumes:
+      - product_uploads:/var/www/html/storage/app/public
+
+  # 3 عمال على نفس الطابور (التعليق بملف شهد لا يكفي: لازم replicas فعلية)
+  laravel-queue-emails:
+    deploy:
+      replicas: 3
+
+volumes:
+  product_uploads:

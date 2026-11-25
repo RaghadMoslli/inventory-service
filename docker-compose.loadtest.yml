@@ -1,0 +1,23 @@
+# ===== مهم قبل اختبار الحمل =====
+# المشروع حالياً يرسل الإيميلات عبر Gmail SMTP الحقيقي. اختبار 500 طلب = 500 إيميل حقيقي
+# (حظر حساب Gmail + إغراق بريد الزبائن). هذا الملف يحوّل الإيميل مؤقتاً إلى Mailpit المحلي.
+# التشغيل:
+#   docker compose -f docker-compose.yml -f docker-compose.after.yml -f docker-compose.loadtest.yml up -d
+# الإيميلات تظهر بـ http://localhost:8025
+
+x-mailpit: &mailpit
+  MAIL_MAILER: smtp
+  MAIL_HOST: mailpit
+  MAIL_PORT: "1025"
+  MAIL_USERNAME: ""
+  MAIL_PASSWORD: ""
+
+services:
+  app1:
+    environment: *mailpit
+  app2:
+    environment: *mailpit
+  app3:
+    environment: *mailpit
+  laravel-queue-emails:
+    environment: *mailpit

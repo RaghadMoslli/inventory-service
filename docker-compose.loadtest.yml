@@ -1,0 +1,65 @@
+# Overlay: route mail to Mailpit during load tests (avoid flooding Gmail).
+x-laravel-env: &laravel-env
+  MAIL_MAILER: smtp
+  MAIL_HOST: mailpit
+  MAIL_PORT: 1025
+  MAIL_USERNAME: null
+  MAIL_PASSWORD: null
+  MAIL_FROM_ADDRESS: loadtest@ecommerce.local
+  MAIL_FROM_NAME: LoadTest
+
+services:
+  app1:
+    environment:
+      MAIL_MAILER: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      MAIL_USERNAME: ""
+      MAIL_PASSWORD: ""
+      MAIL_FROM_ADDRESS: loadtest@ecommerce.local
+      MAIL_FROM_NAME: LoadTest
+  app2:
+    environment:
+      MAIL_MAILER: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      MAIL_USERNAME: ""
+      MAIL_PASSWORD: ""
+      MAIL_FROM_ADDRESS: loadtest@ecommerce.local
+      MAIL_FROM_NAME: LoadTest
+  app3:
+    environment:
+      MAIL_MAILER: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      MAIL_USERNAME: ""
+      MAIL_PASSWORD: ""
+      MAIL_FROM_ADDRESS: loadtest@ecommerce.local
+      MAIL_FROM_NAME: LoadTest
+  laravel-queue-emails-1:
+    environment:
+      MAIL_MAILER: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      MAIL_USERNAME: ""
+      MAIL_PASSWORD: ""
+      MAIL_FROM_ADDRESS: loadtest@ecommerce.local
+      MAIL_FROM_NAME: LoadTest
+  laravel-queue-emails-2:
+    environment:
+      MAIL_MAILER: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      MAIL_USERNAME: ""
+      MAIL_PASSWORD: ""
+      MAIL_FROM_ADDRESS: loadtest@ecommerce.local
+      MAIL_FROM_NAME: LoadTest
+  laravel-queue-emails-3:
+    environment:
+      MAIL_MAILER: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      MAIL_USERNAME: ""
+      MAIL_PASSWORD: ""
+      MAIL_FROM_ADDRESS: loadtest@ecommerce.local
+      MAIL_FROM_NAME: LoadTest

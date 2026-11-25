@@ -25,6 +25,16 @@ return Application::configure(basePath: dirname(__DIR__))
         ['prefix' => 'api/v1', 'middleware' => ['api', 'auth:api']],
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Trust Nginx so rate-limit / auth see the real client IP via X-Forwarded-For.
+        $middleware->trustProxies(
+            at: '*',
+            headers: Request::HEADER_X_FORWARDED_FOR
+                | Request::HEADER_X_FORWARDED_HOST
+                | Request::HEADER_X_FORWARDED_PORT
+                | Request::HEADER_X_FORWARDED_PROTO
+                | Request::HEADER_X_FORWARDED_PREFIX
+        );
+
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckRole::class,
             'etag' => \App\Http\Middleware\ETagMiddleware::class,

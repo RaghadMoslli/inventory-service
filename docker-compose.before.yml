@@ -1,0 +1,8 @@
+# Overlay: simulate broken/local state on app2 only (for "before" demos).
+services:
+  app2:
+    environment:
+      CACHE_STORE: file
+    tmpfs:
+      - /var/www/html/storage/framework/cache:rw,noexec,nosuid,size=64m
+      - /var/www/html/storage/app:rw,noexec,nosuid,size=64m

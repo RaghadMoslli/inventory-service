@@ -17,7 +17,7 @@ x-laravel-env: &laravel-env
   INVENTORY_DRIVER: grpc
   PERF_DEBUG: "true"
   CACHE_STORE: redis
-  SESSION_DRIVER: database
+  SESSION_DRIVER: redis
   REDIS_CLIENT: predis
   REDIS_HOST: redis
   REDIS_PORT: 6379
@@ -68,6 +68,7 @@ x-laravel-common: &laravel-common
   volumes:
     - ./backend/laravel-app:/var/www/html
     - laravel_vendor:/var/www/html/vendor
+    - product_uploads:/var/www/html/storage/app/public/products
     - ./inventory-service/proto:/proto:ro
 
 x-laravel-worker: &laravel-worker
@@ -409,3 +410,4 @@ volumes:
   inventory_postgres_data:
   laravel_vendor:
   frontend_node_modules:
+  product_uploads:

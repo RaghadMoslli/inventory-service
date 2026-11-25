@@ -2,10 +2,14 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Facades\Cache;
+use Throwable;
+
 class PerfMode
 {
-
     private static ?array $cache = null;
+
+    private const REDIS_KEY = 'perf:mode:flags';
 
     public static function flags(): array
     {
@@ -16,9 +20,8 @@ class PerfMode
         $flags = array_fill_keys(config('perf.flags', []), true);
 
         if (! app()->isProduction()) {
-            $file = config('perf.state_file');
-            if (is_string($file) && is_file($file)) {
-                $data = json_decode((string) @file_get_contents($file), true);
+            try {
+                $data = Cache::store('redis')->get(self::REDIS_KEY);
                 if (is_array($data)) {
                     foreach ($flags as $name => $_) {
                         if (array_key_exists($name, $data)) {
@@ -26,6 +29,8 @@ class PerfMode
                         }
                     }
                 }
+            } catch (Throwable) {
+                // Redis down: keep defaults so requests still succeed.
             }
         }
 
@@ -39,14 +44,19 @@ class PerfMode
 
     public static function save(array $flags): void
     {
-        $file = config('perf.state_file');
-        $dir = dirname($file);
-        if (! is_dir($dir)) {
-            mkdir($dir, 0775, true);
+        try {
+            Cache::store('redis')->forever(self::REDIS_KEY, $flags);
+        } catch (Throwable) {
+            // Ignore persistence failure; in-memory cache still updates for this process.
         }
 
-        file_put_contents($file, json_encode($flags, JSON_PRETTY_PRINT), LOCK_EX);
         self::forget();
+        self::$cache = array_fill_keys(config('perf.flags', []), true);
+        foreach (self::$cache as $name => $_) {
+            if (array_key_exists($name, $flags)) {
+                self::$cache[$name] = (bool) $flags[$name];
+            }
+        }
     }
 
     public static function label(): string

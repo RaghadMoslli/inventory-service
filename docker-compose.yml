@@ -263,14 +263,29 @@ services:
     ports:
       - "8003:8000"
 
- 
-  # --- Email Queue Worker: 3 replicas ---
-  laravel-queue-emails:
+  # --- Email Queue Workers: 3 workers on the same `emails` queue ---
+  # Explicit services (not deploy.replicas) so `docker compose up` starts all 3
+  # without Swarm / without manual --scale.
+  laravel-queue-emails-1:
     <<: *laravel-worker
     environment:
       <<: *laravel-env
       INVENTORY_DRIVER: fake
+      WORKER_NAME: emails-1
 
+  laravel-queue-emails-2:
+    <<: *laravel-worker
+    environment:
+      <<: *laravel-env
+      INVENTORY_DRIVER: fake
+      WORKER_NAME: emails-2
+
+  laravel-queue-emails-3:
+    <<: *laravel-worker
+    environment:
+      <<: *laravel-env
+      INVENTORY_DRIVER: fake
+      WORKER_NAME: emails-3
 
   # --- [غالية] سيرفر WebSocket (Laravel Reverb) ---
   reverb:

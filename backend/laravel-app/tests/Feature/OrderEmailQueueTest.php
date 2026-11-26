@@ -83,6 +83,32 @@ class OrderEmailQueueTest extends TestCase
         Queue::assertPushedOn('emails', SendOrderEmailJob::class);
     }
 
+    public function test_listener_marks_email_dead_when_queue_publish_fails(): void
+    {
+        $this->mock(\Illuminate\Contracts\Bus\Dispatcher::class, function ($mock) {
+            $mock->shouldReceive('dispatch')
+                ->andThrow(new \RuntimeException('RabbitMQ unavailable'));
+        });
+
+        $user = User::factory()->create(['email' => 'buyer@test.com', 'role' => 'customer']);
+        $order = Order::create([
+            'user_id' => $user->id,
+            'status' => 'PENDING',
+            'reservation_id' => 'r1',
+            'total_amount' => 20,
+        ]);
+        $order->setRelation('user', $user);
+
+        (new QueueOrderEmail())->handle(new OrderCreated($order));
+
+        $this->assertDatabaseHas('email_logs', [
+            'order_id' => $order->id,
+            'to' => 'buyer@test.com',
+            'status' => EmailLog::STATUS_DEAD,
+            'error' => 'RabbitMQ unavailable',
+        ]);
+    }
+
     public function test_email_job_marks_sent_and_is_not_duplicated(): void
     {
         Mail::fake();

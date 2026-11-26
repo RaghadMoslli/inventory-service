@@ -234,7 +234,14 @@ public function history($id)
             ], 500);
         }
 
-        event(new OrderCreated($order));
+        try {
+            event(new OrderCreated($order));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('OrderCreated side-effects failed after order save', [
+                'order_id' => $order->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return response()->json([
             'message' => 'تم إنشاء الطلب بنجاح',
